@@ -2,23 +2,6 @@ import { pool } from '../../src/db/client';
 import { runMigrations } from '../../src/db/migrate';
 
 describe('runMigrations', () => {
-  beforeEach(async () => {
-    // Reset database state to test migration application
-    try {
-      // Drop tables in reverse order of creation (respecting foreign keys)
-      await pool.query(`
-        DROP TABLE IF EXISTS tasks CASCADE;
-        DROP TABLE IF EXISTS refresh_tokens CASCADE;
-        DROP TABLE IF EXISTS password_reset_tokens CASCADE;
-        DROP TABLE IF EXISTS email_verification_tokens CASCADE;
-        DROP TABLE IF EXISTS users CASCADE;
-        TRUNCATE TABLE schema_migrations;
-      `);
-    } catch {
-      // Tables might not exist yet, which is fine
-    }
-  });
-
   afterAll(async () => {
     await pool.end();
   });
