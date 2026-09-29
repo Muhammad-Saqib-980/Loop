@@ -79,13 +79,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.todoapp"
+    namespace 'com.todoapp'
     defaultConfig {
-        applicationId "com.todoapp"
+        applicationId 'com.todoapp'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "0.0.1"
     }
     signingConfigs {
         debug {
