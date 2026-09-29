@@ -1,14 +1,23 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { hashPassword } from '../auth/password';
-import { generateOpaqueToken, hashToken } from '../auth/tokens';
+import { hashPassword, verifyPassword } from '../auth/password';
+import {
+  generateOpaqueToken,
+  hashToken,
+  refreshTokenExpiry,
+  signAccessToken,
+} from '../auth/tokens';
 import type { EmailSender } from '../email/sender';
 import { verificationEmail } from '../email/templates';
 import { env } from '../env';
 import {
   createEmailVerificationToken,
+  createRefreshToken,
+  findRefreshTokenByHash,
   findValidEmailVerificationToken,
   markEmailVerificationTokenUsed,
+  revokeAllRefreshTokensForUser,
+  revokeRefreshToken,
 } from '../db/tokens';
 import { createUser, findUserByEmail, markEmailVerified } from '../db/users';
 import { authRateLimiter } from '../middleware/rateLimit';
@@ -92,6 +101,74 @@ export function createAuthRouter(emailSender: EmailSender): Router {
     res.status(200).json({
       message: 'If this account exists and is unverified, a new link has been sent.',
     });
+  });
+
+  router.post('/login', authRateLimiter, async (req, res) => {
+    const parsed = z
+      .object({ email: z.string().email(), password: z.string().min(1) })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid email or password' });
+      return;
+    }
+    const { email, password } = parsed.data;
+    const user = await findUserByEmail(email);
+    if (!user || !(await verifyPassword(password, user.passwordHash))) {
+      res.status(401).json({ error: 'Invalid credentials' });
+      return;
+    }
+    if (!user.emailVerified) {
+      res.status(403).json({ error: 'Email not verified', code: 'EMAIL_NOT_VERIFIED' });
+      return;
+    }
+
+    const accessToken = signAccessToken(user.id);
+    const refreshToken = generateOpaqueToken();
+    await createRefreshToken(user.id, hashToken(refreshToken), refreshTokenExpiry());
+
+    res.status(200).json({ accessToken, refreshToken });
+  });
+
+  router.post('/refresh', async (req, res) => {
+    const parsed = z.object({ refreshToken: z.string().min(1) }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid refresh token' });
+      return;
+    }
+    const record = await findRefreshTokenByHash(hashToken(parsed.data.refreshToken));
+    if (!record || record.expiresAt.getTime() < Date.now()) {
+      res.status(401).json({ error: 'Invalid or expired refresh token' });
+      return;
+    }
+    if (record.revokedAt) {
+      await revokeAllRefreshTokensForUser(record.userId);
+      res.status(401).json({ error: 'Refresh token has been revoked' });
+      return;
+    }
+
+    const newRefreshToken = generateOpaqueToken();
+    const newTokenId = await createRefreshToken(
+      record.userId,
+      hashToken(newRefreshToken),
+      refreshTokenExpiry(),
+    );
+    await revokeRefreshToken(record.id, newTokenId);
+
+    const accessToken = signAccessToken(record.userId);
+    res.status(200).json({ accessToken, refreshToken: newRefreshToken });
+  });
+
+  router.post('/logout', async (req, res) => {
+    const parsed = z.object({ refreshToken: z.string().min(1) }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid refresh token' });
+      return;
+    }
+    const record = await findRefreshTokenByHash(hashToken(parsed.data.refreshToken));
+    if (record && !record.revokedAt) {
+      await revokeRefreshToken(record.id);
+    }
+    res.status(200).json({ message: 'Logged out' });
   });
 
   return router;
