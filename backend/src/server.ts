@@ -38,8 +38,29 @@ export function createServer(emailSender: EmailSender = new ResendEmailSender())
   });
 
   app.use(
-    (err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-      console.error(err);
+    (
+      err: Record<string, unknown>,
+      _req: express.Request,
+      res: express.Response,
+      _next: express.NextFunction,
+    ) => {
+      // Log only the safe, diagnostic-relevant fields. Never log `err` itself
+      // (or e.g. body-parser's `.body` property on parse errors) since it can
+      // carry raw request body content such as a plaintext login password.
+      console.error('Unhandled error:', {
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack,
+      });
+
+      const rawStatus = err?.status ?? err?.statusCode;
+      const status = typeof rawStatus === 'number' ? rawStatus : 500;
+
+      if (status >= 400 && status < 500) {
+        res.status(status).json({ error: 'Invalid request' });
+        return;
+      }
+
       res.status(500).json({ error: 'Internal server error' });
     },
   );
