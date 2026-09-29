@@ -9,5 +9,3 @@ export function createAuthRateLimiter(limit: number, windowMs: number) {
     message: { error: 'Too many requests, please try again later.' },
   });
 }
-
-export const authRateLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);

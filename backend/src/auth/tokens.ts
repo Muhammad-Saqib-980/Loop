@@ -13,7 +13,7 @@ export function signAccessToken(userId: string): string {
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
-  const decoded = jwt.verify(token, env.JWT_SECRET);
+  const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });
   if (typeof decoded === 'string' || typeof decoded.sub !== 'string') {
     throw new Error('Invalid access token payload');
   }
