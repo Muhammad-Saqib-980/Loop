@@ -1,0 +1,3 @@
+CREATE UNIQUE INDEX email_verification_tokens_token_hash_idx ON email_verification_tokens(token_hash);
+CREATE UNIQUE INDEX password_reset_tokens_token_hash_idx ON password_reset_tokens(token_hash);
+CREATE UNIQUE INDEX refresh_tokens_token_hash_idx ON refresh_tokens(token_hash);
