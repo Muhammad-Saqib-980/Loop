@@ -8,8 +8,15 @@
     "web": {
       "bundler": "metro"
     },
+    "android": {
+      "package": "com.todoapp"
+    },
+    "ios": {
+      "bundleIdentifier": "com.todoapp"
+    },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-secure-store"
     ]
   }
 }
