@@ -1,5 +1,6 @@
 import type {WidgetTaskHandler} from 'react-native-android-widget';
 import {getTasks, toggleTaskComplete} from '../storage/taskStorage';
+import {readWidgetCache} from '../storage/widgetCache';
 import {TodoWidgetComponent} from './TodoWidgetComponent';
 
 export const widgetTaskHandler: WidgetTaskHandler = async props => {
@@ -7,19 +8,22 @@ export const widgetTaskHandler: WidgetTaskHandler = async props => {
     case 'WIDGET_ADDED':
     case 'WIDGET_UPDATE':
     case 'WIDGET_RESIZED': {
-      const tasks = await getTasks();
-      props.renderWidget(TodoWidgetComponent({tasks}));
+      const cached = await readWidgetCache();
+      props.renderWidget(TodoWidgetComponent({tasks: cached}));
+      getTasks()
+        .then(tasks => props.renderWidget(TodoWidgetComponent({tasks})))
+        .catch(() => {});
       break;
     }
     case 'WIDGET_CLICK': {
       if (props.clickAction === 'TOGGLE_TASK') {
         const taskId = props.clickActionData?.taskId as string | undefined;
         if (taskId) {
-          await toggleTaskComplete(taskId);
+          await toggleTaskComplete(taskId).catch(() => {});
         }
       }
-      const tasks = await getTasks();
-      props.renderWidget(TodoWidgetComponent({tasks}));
+      const cached = await readWidgetCache();
+      props.renderWidget(TodoWidgetComponent({tasks: cached}));
       break;
     }
     case 'WIDGET_DELETED':
