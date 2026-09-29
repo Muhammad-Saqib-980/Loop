@@ -12,6 +12,7 @@ const schema = z.object({
   CORS_ORIGINS: z.string().default(''),
   PORT: z.coerce.number().default(4000),
   NODE_ENV: z.string().default('development'),
+  TRUST_PROXY: z.string().default('false'),
 });
 
 export const env = schema.parse(process.env);

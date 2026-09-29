@@ -11,6 +11,11 @@ import { createTasksRouter } from './routes/tasks';
 export function createServer(emailSender: EmailSender = new ResendEmailSender()) {
   const app = express();
 
+  // Managed hosts (Render/Fly/Railway) put the app behind a reverse proxy, so
+  // req.ip would otherwise resolve to the proxy's address instead of the real
+  // client, breaking per-IP rate limiting. Trust a single hop when enabled.
+  app.set('trust proxy', env.TRUST_PROXY === 'true' ? 1 : false);
+
   app.use(helmet());
   app.use(
     cors({

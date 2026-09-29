@@ -9,3 +9,4 @@ process.env.APP_BASE_URL = 'http://localhost:3000';
 process.env.CORS_ORIGINS = 'http://localhost:3000';
 process.env.PORT = '4000';
 process.env.NODE_ENV = 'test';
+process.env.TRUST_PROXY = 'false';
