@@ -51,7 +51,11 @@ export default function TaskListScreen() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   useEffect(() => {
-    getTasks().then(setTasks);
+    // A failed load (offline, or mounted briefly before the auth guard
+    // redirects) leaves the list as-is rather than throwing unhandled.
+    getTasks()
+      .then(setTasks)
+      .catch(() => {});
     return subscribeToTasks(setTasks);
   }, []);
 

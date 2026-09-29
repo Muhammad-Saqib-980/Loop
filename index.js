@@ -3,7 +3,11 @@
  */
 
 import 'expo-router/entry';
+import {Platform} from 'react-native';
 import {registerWidgetTaskHandler} from 'react-native-android-widget';
 import {widgetTaskHandler} from './src/widgets/widget-task-handler';
 
-registerWidgetTaskHandler(widgetTaskHandler);
+// The widget is Android-only; react-native-web has no headless task support.
+if (Platform.OS === 'android') {
+  registerWidgetTaskHandler(widgetTaskHandler);
+}
