@@ -1,0 +1,52 @@
+### Register
+POST http://localhost:4000/auth/register
+Content-Type: application/json
+
+{
+  "email": "you@example.com",
+  "password": "a-long-enough-password"
+}
+
+### Verify email (replace TOKEN with the value logged/emailed by register)
+POST http://localhost:4000/auth/verify-email
+Content-Type: application/json
+
+{
+  "token": "TOKEN"
+}
+
+### Login
+POST http://localhost:4000/auth/login
+Content-Type: application/json
+
+{
+  "email": "you@example.com",
+  "password": "a-long-enough-password"
+}
+
+### List tasks (replace TOKEN with the accessToken from login)
+GET http://localhost:4000/tasks
+Authorization: Bearer TOKEN
+
+### Create a task
+POST http://localhost:4000/tasks
+Authorization: Bearer TOKEN
+Content-Type: application/json
+
+{
+  "title": "Buy milk",
+  "priority": "medium",
+  "dueDate": "2026-10-01"
+}
+
+### Toggle a task complete (replace TASK_ID)
+POST http://localhost:4000/tasks/TASK_ID/toggle
+Authorization: Bearer TOKEN
+
+### Forgot password
+POST http://localhost:4000/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "you@example.com"
+}
