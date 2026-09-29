@@ -123,3 +123,8 @@ export async function importTasksFromJSON(json: string): Promise<void> {
   const parsed = JSON.parse(json) as Task[];
   await writeTasks(parsed);
 }
+
+export async function clearLocalTaskCache(): Promise<void> {
+  cache = null;
+  listeners.forEach(l => l([]));
+}
