@@ -8,18 +8,21 @@ import {
   signAccessToken,
 } from '../auth/tokens';
 import type { EmailSender } from '../email/sender';
-import { verificationEmail } from '../email/templates';
+import { passwordResetEmail, verificationEmail } from '../email/templates';
 import { env } from '../env';
 import {
   createEmailVerificationToken,
+  createPasswordResetToken,
   createRefreshToken,
   findRefreshTokenByHash,
   findValidEmailVerificationToken,
+  findValidPasswordResetToken,
   markEmailVerificationTokenUsed,
+  markPasswordResetTokenUsed,
   revokeAllRefreshTokensForUser,
   revokeRefreshToken,
 } from '../db/tokens';
-import { createUser, findUserByEmail, markEmailVerified } from '../db/users';
+import { createUser, findUserByEmail, markEmailVerified, updatePasswordHash } from '../db/users';
 import { createAuthRateLimiter } from '../middleware/rateLimit';
 
 const registerSchema = z.object({
@@ -54,6 +57,7 @@ export function createAuthRouter(emailSender: EmailSender): Router {
   const registerLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);
   const resendVerificationLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);
   const loginLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);
+  const forgotPasswordLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);
 
   router.post('/register', registerLimiter, async (req, res) => {
     const parsed = registerSchema.safeParse(req.body);
@@ -173,6 +177,46 @@ export function createAuthRouter(emailSender: EmailSender): Router {
       await revokeRefreshToken(record.id);
     }
     res.status(200).json({ message: 'Logged out' });
+  });
+
+  router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
+    const parsed = z.object({ email: z.string().email() }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid email' });
+      return;
+    }
+    const user = await findUserByEmail(parsed.data.email);
+    if (user) {
+      const token = generateOpaqueToken();
+      await createPasswordResetToken(
+        user.id,
+        hashToken(token),
+        new Date(Date.now() + 60 * 60 * 1000),
+      );
+      const { subject, html } = passwordResetEmail(env.APP_BASE_URL, token);
+      await emailSender.send(user.email, subject, html);
+    }
+    res.status(200).json({ message: 'If this account exists, a reset link has been sent.' });
+  });
+
+  router.post('/reset-password', async (req, res) => {
+    const parsed = z
+      .object({ token: z.string().min(1), newPassword: z.string().min(8) })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid token or password' });
+      return;
+    }
+    const record = await findValidPasswordResetToken(hashToken(parsed.data.token));
+    if (!record) {
+      res.status(400).json({ error: 'Invalid or expired token' });
+      return;
+    }
+    const passwordHash = await hashPassword(parsed.data.newPassword);
+    await updatePasswordHash(record.userId, passwordHash);
+    await markPasswordResetTokenUsed(record.id);
+    await revokeAllRefreshTokensForUser(record.userId);
+    res.status(200).json({ message: 'Password updated' });
   });
 
   return router;
