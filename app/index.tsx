@@ -42,7 +42,7 @@ const FILTERS: {key: FilterKey; label: string}[] = [
 ];
 
 export default function TaskListScreen() {
-  const {logout} = useAuth();
+  const {logout, status} = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<FilterKey>('today');
   const [query, setQuery] = useState('');
@@ -51,13 +51,16 @@ export default function TaskListScreen() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   useEffect(() => {
-    // A failed load (offline, or mounted briefly before the auth guard
-    // redirects) leaves the list as-is rather than throwing unhandled.
+    if (status !== 'authed') {
+      return;
+    }
     getTasks()
       .then(setTasks)
-      .catch(() => {});
+      .catch(err => {
+        console.error('Failed to load tasks', err);
+      });
     return subscribeToTasks(setTasks);
-  }, []);
+  }, [status]);
 
   const filtered = useMemo(() => {
     let list: Task[];

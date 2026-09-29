@@ -19,7 +19,7 @@ describe('TaskListScreen', () => {
   });
 
   it('renders the tasks due today from storage', async () => {
-    mockUseAuth.mockReturnValue({logout: jest.fn()});
+    mockUseAuth.mockReturnValue({logout: jest.fn(), status: 'authed'});
     mockGetTasks.mockResolvedValue([
       {
         id: 't1',
@@ -39,7 +39,7 @@ describe('TaskListScreen', () => {
 
   it('logs out when "Log out" is pressed', async () => {
     const logout = jest.fn().mockResolvedValue(undefined);
-    mockUseAuth.mockReturnValue({logout});
+    mockUseAuth.mockReturnValue({logout, status: 'authed'});
     mockGetTasks.mockResolvedValue([]);
     const {getByText} = render(<TaskListScreen />);
 
@@ -48,5 +48,13 @@ describe('TaskListScreen', () => {
     );
     fireEvent.press(getByText('Log out'));
     expect(logout).toHaveBeenCalled();
+  });
+
+  it('does not fetch tasks while not authenticated', async () => {
+    mockUseAuth.mockReturnValue({logout: jest.fn(), status: 'anonymous'});
+    render(<TaskListScreen />);
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(mockGetTasks).not.toHaveBeenCalled();
   });
 });
