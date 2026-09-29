@@ -159,10 +159,10 @@ independently from its own state when the mutation drains).
 unsynced across a day boundary, the server computes "today" at replay
 time, which can differ from the optimistic client-side guess made at tap
 time. The result: the optimistically-shown state may briefly disagree
-with what the server ultimately records. This resolves itself on the
-sync engine's next pull-and-diff (§ "Sync engine" step 2), since the
-server's returned state is authoritative there. No data is lost; the
-worst case is a stale on-screen state for one sync cycle.
+with what the server ultimately records. This resolves itself once the
+`toggle` mutation drains (§ "Sync engine," `syncNow()` step 3), since the
+drained response is applied directly and is authoritative. No data is
+lost; the worst case is a stale on-screen state for one sync cycle.
 
 ## Sync engine
 
@@ -182,36 +182,52 @@ decision.
 
 Skipped entirely (no-op) if `NetInfo` currently reports offline.
 
-1. **Drain the queue, in order.** For each `QueuedMutation`, call the
-   matching `api/tasks.ts` function. On success: remove the entry, and
-   if it was a `create`, run the id-remap pass. On a network-shaped
-   failure (request never completed): stop draining — leave this and
-   all later entries queued for the next sync attempt. On a
-   non-network failure (e.g. 404 because the task was already deleted
-   server-side by another session, or a validation error): drop just
-   that entry and continue draining the rest — it cannot succeed by
-   retrying unchanged.
-2. **Pull the full list** (`fetchTasks()`) and diff against
-   `localTaskCache`'s last-known-synced snapshot:
-   - Present in the server response but not locally known → added
-     elsewhere; add it to the local cache.
-   - Present locally but missing from the server response → deleted
-     elsewhere; remove it locally, **unless** it corresponds to a still
-     -queued local `create` that has not synced yet (those are skipped;
-     the server doesn't know about them yet, that's not a deletion).
-   - Present in both, with differing `updatedAt` → **last-write-wins**:
-     keep whichever side has the later `updatedAt` (server row) vs.
-     `clientTimestamp` (any still-queued local edit for that task);
-     discard the other side's value entirely, whole-record, not
-     field-by-field.
-3. Write the reconciled list back to `localTaskCache`, notify
+**Correctness constraint driving this order:** the backend's update/
+toggle endpoints (`backend/src/db/tasks.ts`) perform an unconditional
+overwrite — there is no `updatedAt` guard or optimistic-concurrency
+check, and adding one is out of scope (no backend changes). That means
+last-write-wins can only be enforced **before** a queued mutation is
+sent — once sent, it always wins unconditionally, with no server-side
+comparison ever happening. So the server's current state must be
+fetched *before* draining, not after.
+
+1. **Pull the full list first** (`fetchTasks()`), giving each task's
+   current server `updatedAt`.
+2. **LWW-filter the queue against that pull.** For each `QueuedMutation`
+   of type `update` or `toggle`: if the server response contains that
+   `taskId` with `updatedAt` later than the mutation's
+   `clientTimestamp`, **drop** the mutation (someone else's edit is
+   newer; discard the stale local one) without sending it. `create` and
+   `delete` mutations are never dropped here — a `create` has no server
+   row yet to compare against by definition, and a `delete`'s intent
+   ("this task should not exist") always takes precedence over a
+   concurrent edit to the same task.
+3. **Drain the surviving queue, in order.** For each remaining
+   `QueuedMutation`, call the matching `api/tasks.ts` function and apply
+   its response directly into `localTaskCache` (no second pull needed
+   for that task — the response is already the authoritative new row).
+   On success: remove the entry, and if it was a `create`, run the
+   id-remap pass. On a network-shaped failure (request never
+   completed): stop draining — leave this and all later entries queued
+   for the next sync attempt. On a non-network failure (e.g. 404
+   because the task was already deleted server-side by another session,
+   or a validation error): drop just that entry and continue draining
+   the rest — it cannot succeed by retrying unchanged.
+4. **Reconcile the rest of the list** by merging the step-1 pull with
+   `localTaskCache`: for every task id in the pull result that wasn't
+   just handled by step 3, take the server's copy (this covers both
+   "added elsewhere" and "edited elsewhere, no local conflict" cases).
+   For every task id present in `localTaskCache` but missing from the
+   pull result, remove it locally (deleted elsewhere) **unless** it's a
+   still-queued local `create`'s temp id (that create hasn't synced
+   yet — not a deletion) or a mutation for it is still queued after
+   step 3 stopped early on a network failure (don't discard an
+   unsynced local task just because a network hiccup mid-drain left the
+   pull momentarily out of sync with it).
+5. Write the reconciled list back to `localTaskCache`, notify
    `subscribeToTasks` listeners, and refresh the widget cache via the
    existing `writeWidgetCache`/`syncWidget` calls (unchanged from Phase
    2).
-
-Draining happens before pulling specifically so that a mutation which
-just succeeded is reflected in the server's response, and the diff step
-treats it as already-reconciled rather than a false conflict.
 
 ## Widget integration
 
