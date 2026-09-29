@@ -15,10 +15,13 @@ import {
   updateTaskApi,
 } from '../src/api/tasks';
 import {clearWidgetCache, writeWidgetCache} from '../src/storage/widgetCache';
+import {syncWidget} from '../src/widgets/syncWidget';
 import type {Task} from '../src/types/task';
+import {Platform} from 'react-native';
 
 jest.mock('../src/api/tasks');
 jest.mock('../src/storage/widgetCache');
+jest.mock('../src/widgets/syncWidget');
 
 const mockFetchTasks = fetchTasks as jest.Mock;
 const mockCreateTaskApi = createTaskApi as jest.Mock;
@@ -27,6 +30,7 @@ const mockDeleteTaskApi = deleteTaskApi as jest.Mock;
 const mockToggleTaskApi = toggleTaskApi as jest.Mock;
 const mockWriteWidgetCache = writeWidgetCache as jest.Mock;
 const mockClearWidgetCache = clearWidgetCache as jest.Mock;
+const mockSyncWidget = syncWidget as jest.Mock;
 
 const task1: Task = {id: '1', title: 'One', priority: 'medium', completed: false, history: [], createdAt: 't1'};
 const task2: Task = {id: '2', title: 'Two', priority: 'low', completed: false, history: [], createdAt: 't2'};
@@ -36,6 +40,11 @@ describe('taskStorage (API-backed)', () => {
     jest.clearAllMocks();
     mockWriteWidgetCache.mockResolvedValue(undefined);
     mockClearWidgetCache.mockResolvedValue(undefined);
+    mockSyncWidget.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    (Platform as any).OS = 'ios';
   });
 
   it('getTasks fetches from the API and notifies subscribers', async () => {
@@ -120,5 +129,52 @@ describe('taskStorage (API-backed)', () => {
     const listener = jest.fn();
     subscribeToTasks(listener);
     expect(listener).toHaveBeenCalledWith([]);
+  });
+
+  it('toggleTaskComplete refetches the full list when the in-memory cache has not been loaded yet (cold start)', async () => {
+    // No prior getTasks() call — cache starts null, matching a fresh headless
+    // JS runtime such as the widget's background task handler. The module-level
+    // cache persists across tests in this file, so load a fresh copy of
+    // taskStorage (and its mocked deps) to guarantee cache === null here.
+    let storage!: typeof import('../src/storage/taskStorage');
+    let api!: typeof import('../src/api/tasks');
+    let widgetCache!: typeof import('../src/storage/widgetCache');
+    jest.isolateModules(() => {
+      storage = require('../src/storage/taskStorage');
+      api = require('../src/api/tasks');
+      widgetCache = require('../src/storage/widgetCache');
+    });
+    const isoFetchTasks = api.fetchTasks as jest.Mock;
+    const isoToggleTaskApi = api.toggleTaskApi as jest.Mock;
+    const isoWriteWidgetCache = widgetCache.writeWidgetCache as jest.Mock;
+    isoWriteWidgetCache.mockResolvedValue(undefined);
+
+    const toggled = {...task1, completed: true};
+    isoToggleTaskApi.mockResolvedValue(toggled);
+    isoFetchTasks.mockResolvedValue([toggled, task2]);
+
+    await storage.toggleTaskComplete('1');
+
+    expect(isoFetchTasks).toHaveBeenCalled();
+    expect(isoWriteWidgetCache).toHaveBeenCalledWith([toggled, task2]);
+  });
+
+  it('getTasks syncs the widget on Android after a fetch', async () => {
+    (Platform as any).OS = 'android';
+    mockFetchTasks.mockResolvedValue([task1]);
+
+    await getTasks();
+
+    expect(mockSyncWidget).toHaveBeenCalledWith([task1]);
+  });
+
+  it('clearLocalTaskCache syncs the widget with an empty list on Android', async () => {
+    (Platform as any).OS = 'android';
+    mockFetchTasks.mockResolvedValue([task1]);
+    await getTasks();
+
+    await clearLocalTaskCache();
+
+    expect(mockSyncWidget).toHaveBeenCalledWith([]);
   });
 });

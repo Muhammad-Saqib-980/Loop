@@ -88,12 +88,19 @@ export default function TaskListScreen() {
     if (!quickTitle.trim()) {
       return;
     }
+    const title = quickTitle;
+    setQuickTitle('');
     addTask({
-      title: quickTitle,
+      title,
       priority: 'medium',
       dueDate: todayISODate(),
+    }).catch(() => {
+      setQuickTitle(title);
+      Alert.alert(
+        'Could not add task',
+        'Please check your connection and try again.',
+      );
     });
-    setQuickTitle('');
   }
 
   function openEditor(task: Task | null) {
@@ -107,17 +114,26 @@ export default function TaskListScreen() {
   }
 
   function handleSave(input: NewTaskInput) {
-    if (editingTask) {
-      updateTask(editingTask.id, input);
-    } else {
-      addTask(input);
-    }
+    const action = editingTask
+      ? updateTask(editingTask.id, input)
+      : addTask(input);
+    action.catch(() => {
+      Alert.alert(
+        'Could not save task',
+        'Please check your connection and try again.',
+      );
+    });
     closeEditor();
   }
 
   function handleDelete() {
     if (editingTask) {
-      deleteTask(editingTask.id);
+      deleteTask(editingTask.id).catch(() => {
+        Alert.alert(
+          'Could not delete task',
+          'Please check your connection and try again.',
+        );
+      });
     }
     closeEditor();
   }
@@ -216,9 +232,23 @@ export default function TaskListScreen() {
                 ? isTaskDoneToday(item)
                 : false
             }
-            onToggle={() => toggleTaskComplete(item.id)}
+            onToggle={() =>
+              toggleTaskComplete(item.id).catch(() => {
+                Alert.alert(
+                  'Could not update task',
+                  'Please check your connection and try again.',
+                );
+              })
+            }
             onPress={() => openEditor(item)}
-            onDelete={() => deleteTask(item.id)}
+            onDelete={() =>
+              deleteTask(item.id).catch(() => {
+                Alert.alert(
+                  'Could not delete task',
+                  'Please check your connection and try again.',
+                );
+              })
+            }
           />
         )}
         ListEmptyComponent={

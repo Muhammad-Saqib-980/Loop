@@ -1,4 +1,4 @@
-import {ApiError, apiFetch} from '../src/api/client';
+import {ApiError, apiFetch, setUnauthorizedHandler} from '../src/api/client';
 import {clearTokens, getTokens, setTokens} from '../src/auth/tokenStorage';
 
 jest.mock('../src/auth/tokenStorage');
@@ -103,5 +103,29 @@ describe('apiFetch', () => {
 
     await expect(apiFetch('/tasks', {method: 'GET'})).rejects.toMatchObject({status: 401});
     expect(mockClearTokens).toHaveBeenCalled();
+  });
+
+  it('does not clear tokens on a transient (non-401) refresh failure', async () => {
+    mockGetTokens.mockResolvedValue({accessToken: 'stale-access', refreshToken: 'refresh-1'});
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({ok: false, status: 401})
+      .mockResolvedValueOnce({ok: false, status: 500});
+
+    await expect(apiFetch('/tasks', {method: 'GET'})).rejects.toMatchObject({status: 401});
+    expect(mockClearTokens).not.toHaveBeenCalled();
+  });
+
+  it('calls the registered unauthorized handler when the refresh token itself is rejected', async () => {
+    const handler = jest.fn();
+    setUnauthorizedHandler(handler);
+    mockGetTokens.mockResolvedValue({accessToken: 'stale-access', refreshToken: 'refresh-1'});
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({ok: false, status: 401})
+      .mockResolvedValueOnce({ok: false, status: 401});
+
+    await expect(apiFetch('/tasks', {method: 'GET'})).rejects.toMatchObject({status: 401});
+    expect(handler).toHaveBeenCalled();
+
+    setUnauthorizedHandler(null);
   });
 });

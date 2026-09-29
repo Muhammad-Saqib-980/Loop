@@ -19,6 +19,16 @@ export class ApiError extends Error {
 // refreshes using the same stale token would force-logout the user.
 let refreshPromise: Promise<string | null> | null = null;
 
+// Set by AuthContext so the app can react (clear cache, flip to
+// 'anonymous') when a refresh genuinely fails — e.g. the session was
+// revoked elsewhere. Not called on a transient/server error; see doRefresh.
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
+}
+
 function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
     refreshPromise = doRefresh().finally(() => {
@@ -38,8 +48,12 @@ async function doRefresh(): Promise<string | null> {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({refreshToken: tokens.refreshToken}),
   });
-  if (!res.ok) {
+  if (res.status === 401) {
     await clearTokens();
+    unauthorizedHandler?.();
+    return null;
+  }
+  if (!res.ok) {
     return null;
   }
   const data = await res.json();

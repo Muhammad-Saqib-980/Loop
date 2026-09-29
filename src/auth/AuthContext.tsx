@@ -2,6 +2,7 @@ import React, {createContext, useCallback, useContext, useEffect, useState} from
 import {clearTokens, getTokens, setTokens} from './tokenStorage';
 import {loginApi, logoutApi, registerApi} from '../api/auth';
 import {clearLocalTaskCache} from '../storage/taskStorage';
+import {setUnauthorizedHandler} from '../api/client';
 
 export type AuthStatus = 'loading' | 'authed' | 'anonymous';
 
@@ -23,7 +24,15 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
     });
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      clearLocalTaskCache().catch(() => {});
+      setStatus('anonymous');
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
+  const login =useCallback(async (email: string, password: string) => {
     const {accessToken, refreshToken} = await loginApi(email, password);
     await setTokens({accessToken, refreshToken});
     setStatus('authed');

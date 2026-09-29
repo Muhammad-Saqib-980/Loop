@@ -5,11 +5,15 @@ import {AuthProvider, useAuth} from '../src/auth/AuthContext';
 import {clearTokens, getTokens, setTokens} from '../src/auth/tokenStorage';
 import {loginApi, logoutApi, registerApi} from '../src/api/auth';
 import {clearLocalTaskCache} from '../src/storage/taskStorage';
+import {setUnauthorizedHandler} from '../src/api/client';
 
 jest.mock('../src/auth/tokenStorage');
 jest.mock('../src/api/auth');
 jest.mock('../src/storage/taskStorage', () => ({
   clearLocalTaskCache: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../src/api/client', () => ({
+  setUnauthorizedHandler: jest.fn(),
 }));
 
 const mockGetTokens = getTokens as jest.Mock;
@@ -19,6 +23,7 @@ const mockLoginApi = loginApi as jest.Mock;
 const mockRegisterApi = registerApi as jest.Mock;
 const mockLogoutApi = logoutApi as jest.Mock;
 const mockClearLocalTaskCache = clearLocalTaskCache as jest.Mock;
+const mockSetUnauthorizedHandler = setUnauthorizedHandler as jest.Mock;
 
 function Probe() {
   const auth = useAuth();
@@ -125,6 +130,24 @@ describe('AuthProvider', () => {
     });
 
     expect(mockRegisterApi).toHaveBeenCalledWith('a@b.com', 'password123');
+    expect(getByText('status:anonymous')).toBeTruthy();
+  });
+
+  it('registers an unauthorized handler that clears the task cache and flips status to anonymous', async () => {
+    mockGetTokens.mockResolvedValue({accessToken: 'a', refreshToken: 'r'});
+    const {getByText} = render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(getByText('status:authed')).toBeTruthy());
+
+    const registeredHandler = mockSetUnauthorizedHandler.mock.calls[0][0];
+    await act(async () => {
+      registeredHandler();
+    });
+
+    expect(mockClearLocalTaskCache).toHaveBeenCalled();
     expect(getByText('status:anonymous')).toBeTruthy();
   });
 
