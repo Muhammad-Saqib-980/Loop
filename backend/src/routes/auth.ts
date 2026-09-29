@@ -20,7 +20,7 @@ import {
   revokeRefreshToken,
 } from '../db/tokens';
 import { createUser, findUserByEmail, markEmailVerified } from '../db/users';
-import { authRateLimiter } from '../middleware/rateLimit';
+import { createAuthRateLimiter } from '../middleware/rateLimit';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -51,7 +51,11 @@ async function sendVerificationEmail(
 export function createAuthRouter(emailSender: EmailSender): Router {
   const router = Router();
 
-  router.post('/register', authRateLimiter, async (req, res) => {
+  const registerLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);
+  const resendVerificationLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);
+  const loginLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);
+
+  router.post('/register', registerLimiter, async (req, res) => {
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid email or password' });
@@ -88,7 +92,7 @@ export function createAuthRouter(emailSender: EmailSender): Router {
     res.status(200).json({ message: 'Email verified' });
   });
 
-  router.post('/resend-verification', authRateLimiter, async (req, res) => {
+  router.post('/resend-verification', resendVerificationLimiter, async (req, res) => {
     const parsed = z.object({ email: z.string().email() }).safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid email' });
@@ -103,7 +107,7 @@ export function createAuthRouter(emailSender: EmailSender): Router {
     });
   });
 
-  router.post('/login', authRateLimiter, async (req, res) => {
+  router.post('/login', loginLimiter, async (req, res) => {
     const parsed = z
       .object({ email: z.string().email(), password: z.string().min(1) })
       .safeParse(req.body);
