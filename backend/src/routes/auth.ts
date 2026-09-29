@@ -36,6 +36,29 @@ const GENERIC_REGISTER_MESSAGE = {
 
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
+// A precomputed bcrypt hash used to run a dummy password comparison when an
+// email lookup fails during login. Without this, an unknown-email response
+// returns immediately after one indexed SELECT while a known-email response
+// also pays for a cost-12 bcrypt compare (hundreds of ms), letting an
+// attacker distinguish registered emails from unregistered ones by timing
+// alone. Computed lazily once and cached, since hashPassword is async.
+let dummyPasswordHashPromise: Promise<string> | null = null;
+function getDummyPasswordHash(): Promise<string> {
+  if (!dummyPasswordHashPromise) {
+    dummyPasswordHashPromise = hashPassword('dummy-password-for-timing-safety');
+  }
+  return dummyPasswordHashPromise;
+}
+
+function sendEmailInBackground(emailSender: EmailSender, to: string, subject: string, html: string): void {
+  // Fire-and-forget: a slow or failing email provider must never add to the
+  // response time (closing most of the register/login timing gap) or crash
+  // the request handler.
+  emailSender.send(to, subject, html).catch(err => {
+    console.error('Failed to send email', err);
+  });
+}
+
 async function sendVerificationEmail(
   emailSender: EmailSender,
   userId: string,
@@ -48,7 +71,7 @@ async function sendVerificationEmail(
     new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
   );
   const { subject, html } = verificationEmail(env.APP_BASE_URL, token);
-  await emailSender.send(email, subject, html);
+  sendEmailInBackground(emailSender, email, subject, html);
 }
 
 export function createAuthRouter(emailSender: EmailSender): Router {
@@ -121,7 +144,16 @@ export function createAuthRouter(emailSender: EmailSender): Router {
     }
     const { email, password } = parsed.data;
     const user = await findUserByEmail(email);
-    if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    if (!user) {
+      // Run a dummy bcrypt compare so this path costs roughly the same as
+      // the known-email path below, regardless of its (discarded) result -
+      // this prevents an attacker from inferring account existence from
+      // response timing alone.
+      await verifyPassword(password, await getDummyPasswordHash());
+      res.status(401).json({ error: 'Invalid credentials' });
+      return;
+    }
+    if (!(await verifyPassword(password, user.passwordHash))) {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
@@ -194,7 +226,7 @@ export function createAuthRouter(emailSender: EmailSender): Router {
         new Date(Date.now() + 60 * 60 * 1000),
       );
       const { subject, html } = passwordResetEmail(env.APP_BASE_URL, token);
-      await emailSender.send(user.email, subject, html);
+      sendEmailInBackground(emailSender, user.email, subject, html);
     }
     res.status(200).json({ message: 'If this account exists, a reset link has been sent.' });
   });
