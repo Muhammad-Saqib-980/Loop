@@ -1,4 +1,12 @@
 {
   "name": "TodoApp",
-  "displayName": "Loop"
+  "displayName": "Loop",
+  "expo": {
+    "name": "Loop",
+    "slug": "loop",
+    "scheme": "loop",
+    "web": {
+      "bundler": "metro"
+    }
+  }
 }
