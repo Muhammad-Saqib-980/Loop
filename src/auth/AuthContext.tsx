@@ -32,7 +32,7 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
     return () => setUnauthorizedHandler(null);
   }, []);
 
-  const login =useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     const {accessToken, refreshToken} = await loginApi(email, password);
     await setTokens({accessToken, refreshToken});
     setStatus('authed');
