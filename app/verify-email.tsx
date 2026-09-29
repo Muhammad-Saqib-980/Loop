@@ -6,7 +6,9 @@ import {authStyles} from '../src/components/authScreenStyles';
 
 export default function VerifyEmailScreen() {
   const {token} = useLocalSearchParams<{token?: string}>();
-  const [status, setStatus] = useState<'checking' | 'success' | 'error'>('checking');
+  const [status, setStatus] = useState<'checking' | 'success' | 'error'>(
+    'checking',
+  );
 
   useEffect(() => {
     if (!token) {
@@ -24,9 +26,13 @@ export default function VerifyEmailScreen() {
       {status === 'checking' ? (
         <Text style={authStyles.noticeText}>Verifying your email...</Text>
       ) : status === 'success' ? (
-        <Text style={authStyles.success}>Your email is verified. You can log in now.</Text>
+        <Text style={authStyles.success}>
+          Your email is verified. You can log in now.
+        </Text>
       ) : (
-        <Text style={authStyles.error}>This verification link is invalid or has expired.</Text>
+        <Text style={authStyles.error}>
+          This verification link is invalid or has expired.
+        </Text>
       )}
       <Link href="/login" style={authStyles.link}>
         Go to login

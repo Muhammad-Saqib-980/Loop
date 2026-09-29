@@ -27,7 +27,9 @@ describe('LoginScreen', () => {
 
     fireEvent.press(getByText('Log in'));
 
-    await waitFor(() => expect(getByText('Enter your email and password.')).toBeTruthy());
+    await waitFor(() =>
+      expect(getByText('Enter your email and password.')).toBeTruthy(),
+    );
   });
 
   it('navigates to / on successful login', async () => {
@@ -39,7 +41,9 @@ describe('LoginScreen', () => {
     fireEvent.changeText(getByPlaceholderText('Password'), 'password123');
     fireEvent.press(getByText('Log in'));
 
-    await waitFor(() => expect(login).toHaveBeenCalledWith('a@b.com', 'password123'));
+    await waitFor(() =>
+      expect(login).toHaveBeenCalledWith('a@b.com', 'password123'),
+    );
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/'));
   });
 
@@ -53,11 +57,19 @@ describe('LoginScreen', () => {
     fireEvent.changeText(getByPlaceholderText('Password'), 'password123');
     fireEvent.press(getByText('Log in'));
 
-    await waitFor(() => expect(getByText("Your email isn't verified yet.")).toBeTruthy());
+    await waitFor(() =>
+      expect(getByText("Your email isn't verified yet.")).toBeTruthy(),
+    );
 
     fireEvent.press(getByText('Resend verification email'));
-    await waitFor(() => expect(mockResendVerificationApi).toHaveBeenCalledWith('a@b.com'));
-    await waitFor(() => expect(getByText('Verification email sent — check your inbox.')).toBeTruthy());
+    await waitFor(() =>
+      expect(mockResendVerificationApi).toHaveBeenCalledWith('a@b.com'),
+    );
+    await waitFor(() =>
+      expect(
+        getByText('Verification email sent — check your inbox.'),
+      ).toBeTruthy(),
+    );
   });
 
   it('shows a generic error for any other login failure', async () => {
@@ -69,6 +81,8 @@ describe('LoginScreen', () => {
     fireEvent.changeText(getByPlaceholderText('Password'), 'wrong');
     fireEvent.press(getByText('Log in'));
 
-    await waitFor(() => expect(getByText('Invalid email or password.')).toBeTruthy());
+    await waitFor(() =>
+      expect(getByText('Invalid email or password.')).toBeTruthy(),
+    );
   });
 });

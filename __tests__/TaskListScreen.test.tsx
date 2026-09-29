@@ -43,7 +43,9 @@ describe('TaskListScreen', () => {
     mockGetTasks.mockResolvedValue([]);
     const {getByText} = render(<TaskListScreen />);
 
-    await waitFor(() => expect(getByText('Nothing here. Enjoy the quiet.')).toBeTruthy());
+    await waitFor(() =>
+      expect(getByText('Nothing here. Enjoy the quiet.')).toBeTruthy(),
+    );
     fireEvent.press(getByText('Log out'));
     expect(logout).toHaveBeenCalled();
   });

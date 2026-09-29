@@ -44,7 +44,8 @@ export default function RegisterScreen() {
 
       {sent ? (
         <Text style={authStyles.success}>
-          If this email can be registered, check your inbox for a verification link.
+          If this email can be registered, check your inbox for a verification
+          link.
         </Text>
       ) : (
         <>

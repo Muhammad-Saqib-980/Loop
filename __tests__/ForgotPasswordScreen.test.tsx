@@ -28,10 +28,14 @@ describe('ForgotPasswordScreen', () => {
     fireEvent.changeText(getByPlaceholderText('Email'), 'a@b.com');
     fireEvent.press(getByText('Send reset link'));
 
-    await waitFor(() => expect(mockForgotPasswordApi).toHaveBeenCalledWith('a@b.com'));
+    await waitFor(() =>
+      expect(mockForgotPasswordApi).toHaveBeenCalledWith('a@b.com'),
+    );
     await waitFor(() =>
       expect(
-        getByText('If that account exists, a reset link has been sent to your email.'),
+        getByText(
+          'If that account exists, a reset link has been sent to your email.',
+        ),
       ).toBeTruthy(),
     );
   });

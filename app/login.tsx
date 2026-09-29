@@ -70,7 +70,9 @@ export default function LoginScreen() {
 
       {needsVerification ? (
         <View style={authStyles.notice}>
-          <Text style={authStyles.noticeText}>Your email isn't verified yet.</Text>
+          <Text style={authStyles.noticeText}>
+            Your email isn't verified yet.
+          </Text>
           {resent ? (
             <Text style={authStyles.noticeText}>
               Verification email sent — check your inbox.
@@ -87,7 +89,9 @@ export default function LoginScreen() {
         style={[authStyles.button, submitting && authStyles.buttonDisabled]}
         onPress={handleSubmit}
         disabled={submitting}>
-        <Text style={authStyles.buttonText}>{submitting ? 'Logging in...' : 'Log in'}</Text>
+        <Text style={authStyles.buttonText}>
+          {submitting ? 'Logging in...' : 'Log in'}
+        </Text>
       </TouchableOpacity>
 
       <Link href="/forgot-password" style={authStyles.link}>

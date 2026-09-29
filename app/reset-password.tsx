@@ -44,7 +44,9 @@ export default function ResetPasswordScreen() {
       <Text style={authStyles.heading}>Reset password</Text>
 
       {success ? (
-        <Text style={authStyles.success}>Password updated. Redirecting to login...</Text>
+        <Text style={authStyles.success}>
+          Password updated. Redirecting to login...
+        </Text>
       ) : (
         <>
           <TextInput

@@ -140,10 +140,14 @@ export default function TaskListScreen() {
           </View>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.widgetButton} onPress={handleAddWidget}>
+          <TouchableOpacity
+            style={styles.widgetButton}
+            onPress={handleAddWidget}>
             <Text style={styles.widgetButtonText}>+ Widget</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.logoutButton} onPress={() => logout()}>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={() => logout()}>
             <Text style={styles.widgetButtonText}>Log out</Text>
           </TouchableOpacity>
         </View>
@@ -159,7 +163,9 @@ export default function TaskListScreen() {
           onSubmitEditing={handleQuickAdd}
           returnKeyType="done"
         />
-        <TouchableOpacity style={styles.quickAddButton} onPress={handleQuickAdd}>
+        <TouchableOpacity
+          style={styles.quickAddButton}
+          onPress={handleQuickAdd}>
           <Text style={styles.quickAddButtonText}>+</Text>
         </TouchableOpacity>
       </View>
@@ -178,7 +184,11 @@ export default function TaskListScreen() {
             key={f.key}
             style={[styles.tab, filter === f.key && styles.tabActive]}
             onPress={() => setFilter(f.key)}>
-            <Text style={[styles.tabText, filter === f.key && styles.tabTextActive]}>
+            <Text
+              style={[
+                styles.tabText,
+                filter === f.key && styles.tabTextActive,
+              ]}>
               {f.label}
             </Text>
           </TouchableOpacity>
@@ -192,7 +202,13 @@ export default function TaskListScreen() {
         renderItem={({item}) => (
           <TaskRow
             task={item}
-            done={filter === 'completed' ? true : filter === 'all' ? isTaskDoneToday(item) : false}
+            done={
+              filter === 'completed'
+                ? true
+                : filter === 'all'
+                ? isTaskDoneToday(item)
+                : false
+            }
             onToggle={() => toggleTaskComplete(item.id)}
             onPress={() => openEditor(item)}
             onDelete={() => deleteTask(item.id)}

@@ -22,7 +22,9 @@ describe('RegisterScreen', () => {
     fireEvent.changeText(getByPlaceholderText('Confirm password'), 'short');
     fireEvent.press(getByText('Register'));
 
-    await waitFor(() => expect(getByText('Password must be at least 8 characters.')).toBeTruthy());
+    await waitFor(() =>
+      expect(getByText('Password must be at least 8 characters.')).toBeTruthy(),
+    );
     expect(mockRegisterApi).not.toHaveBeenCalled();
   });
 
@@ -30,10 +32,15 @@ describe('RegisterScreen', () => {
     const {getByPlaceholderText, getByText} = render(<RegisterScreen />);
     fireEvent.changeText(getByPlaceholderText('Email'), 'a@b.com');
     fireEvent.changeText(getByPlaceholderText('Password'), 'password123');
-    fireEvent.changeText(getByPlaceholderText('Confirm password'), 'password124');
+    fireEvent.changeText(
+      getByPlaceholderText('Confirm password'),
+      'password124',
+    );
     fireEvent.press(getByText('Register'));
 
-    await waitFor(() => expect(getByText('Passwords do not match.')).toBeTruthy());
+    await waitFor(() =>
+      expect(getByText('Passwords do not match.')).toBeTruthy(),
+    );
     expect(mockRegisterApi).not.toHaveBeenCalled();
   });
 
@@ -42,13 +49,20 @@ describe('RegisterScreen', () => {
     const {getByPlaceholderText, getByText} = render(<RegisterScreen />);
     fireEvent.changeText(getByPlaceholderText('Email'), 'a@b.com');
     fireEvent.changeText(getByPlaceholderText('Password'), 'password123');
-    fireEvent.changeText(getByPlaceholderText('Confirm password'), 'password123');
+    fireEvent.changeText(
+      getByPlaceholderText('Confirm password'),
+      'password123',
+    );
     fireEvent.press(getByText('Register'));
 
-    await waitFor(() => expect(mockRegisterApi).toHaveBeenCalledWith('a@b.com', 'password123'));
+    await waitFor(() =>
+      expect(mockRegisterApi).toHaveBeenCalledWith('a@b.com', 'password123'),
+    );
     await waitFor(() =>
       expect(
-        getByText('If this email can be registered, check your inbox for a verification link.'),
+        getByText(
+          'If this email can be registered, check your inbox for a verification link.',
+        ),
       ).toBeTruthy(),
     );
   });

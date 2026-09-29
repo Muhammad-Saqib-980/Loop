@@ -30,7 +30,9 @@ describe('ResetPasswordScreen', () => {
     fireEvent.changeText(getByPlaceholderText('New password'), 'newpassword1');
     fireEvent.press(getByText('Update password'));
 
-    await waitFor(() => expect(getByText('This reset link is invalid.')).toBeTruthy());
+    await waitFor(() =>
+      expect(getByText('This reset link is invalid.')).toBeTruthy(),
+    );
     expect(mockResetPasswordApi).not.toHaveBeenCalled();
   });
 
@@ -56,10 +58,15 @@ describe('ResetPasswordScreen', () => {
     fireEvent.press(getByText('Update password'));
 
     await waitFor(() =>
-      expect(mockResetPasswordApi).toHaveBeenCalledWith('good-token', 'newpassword1'),
+      expect(mockResetPasswordApi).toHaveBeenCalledWith(
+        'good-token',
+        'newpassword1',
+      ),
     );
     await waitFor(() =>
-      expect(getByText('Password updated. Redirecting to login...')).toBeTruthy(),
+      expect(
+        getByText('Password updated. Redirecting to login...'),
+      ).toBeTruthy(),
     );
 
     jest.advanceTimersByTime(1500);
@@ -75,7 +82,9 @@ describe('ResetPasswordScreen', () => {
     fireEvent.press(getByText('Update password'));
 
     await waitFor(() =>
-      expect(getByText('This reset link is invalid or has expired.')).toBeTruthy(),
+      expect(
+        getByText('This reset link is invalid or has expired.'),
+      ).toBeTruthy(),
     );
   });
 

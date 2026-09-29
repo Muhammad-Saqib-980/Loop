@@ -22,7 +22,9 @@ describe('VerifyEmailScreen', () => {
     const {getByText} = render(<VerifyEmailScreen />);
 
     await waitFor(() =>
-      expect(getByText('This verification link is invalid or has expired.')).toBeTruthy(),
+      expect(
+        getByText('This verification link is invalid or has expired.'),
+      ).toBeTruthy(),
     );
     expect(mockVerifyEmailApi).not.toHaveBeenCalled();
   });
@@ -32,9 +34,13 @@ describe('VerifyEmailScreen', () => {
     mockVerifyEmailApi.mockResolvedValue(true);
     const {getByText} = render(<VerifyEmailScreen />);
 
-    await waitFor(() => expect(mockVerifyEmailApi).toHaveBeenCalledWith('good-token'));
     await waitFor(() =>
-      expect(getByText('Your email is verified. You can log in now.')).toBeTruthy(),
+      expect(mockVerifyEmailApi).toHaveBeenCalledWith('good-token'),
+    );
+    await waitFor(() =>
+      expect(
+        getByText('Your email is verified. You can log in now.'),
+      ).toBeTruthy(),
     );
   });
 
@@ -44,7 +50,9 @@ describe('VerifyEmailScreen', () => {
     const {getByText} = render(<VerifyEmailScreen />);
 
     await waitFor(() =>
-      expect(getByText('This verification link is invalid or has expired.')).toBeTruthy(),
+      expect(
+        getByText('This verification link is invalid or has expired.'),
+      ).toBeTruthy(),
     );
   });
 
@@ -54,7 +62,9 @@ describe('VerifyEmailScreen', () => {
     const {getByText} = render(<VerifyEmailScreen />);
 
     await waitFor(() =>
-      expect(getByText('This verification link is invalid or has expired.')).toBeTruthy(),
+      expect(
+        getByText('This verification link is invalid or has expired.'),
+      ).toBeTruthy(),
     );
   });
 });
