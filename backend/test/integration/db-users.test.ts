@@ -34,9 +34,17 @@ describe('user queries', () => {
     expect(byId?.email).toBe('test@example.com');
   });
 
-  it('rejects a duplicate email', async () => {
-    await createUser('dupe@example.com', 'hashed');
-    await expect(createUser('dupe@example.com', 'other-hash')).rejects.toThrow();
+  it('returns the existing user for a duplicate email instead of overwriting it', async () => {
+    // createUser uses INSERT ... ON CONFLICT (email) DO NOTHING so that a
+    // race between a pre-insert existence check and the insert itself
+    // (e.g. two concurrent /register calls) resolves to the original user
+    // rather than throwing or overwriting the original password hash.
+    const original = await createUser('dupe@example.com', 'hashed');
+    const result = await createUser('dupe@example.com', 'other-hash');
+
+    expect(result.id).toBe(original.id);
+    const byEmail = await findUserByEmail('dupe@example.com');
+    expect(byEmail?.passwordHash).toBe('hashed');
   });
 
   it('marks email verified', async () => {

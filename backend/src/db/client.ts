@@ -7,3 +7,11 @@ import { env } from '../env';
 types.setTypeParser(1082, val => val);
 
 export const pool = new Pool({ connectionString: env.DATABASE_URL });
+
+// An idle client in the pool can be dropped by the database (e.g. a network
+// blip or server-side timeout) and emits an 'error' event on the pool. With
+// no listener, that becomes an unhandled 'error' event and crashes the
+// process. Log it instead so the pool can keep serving other connections.
+pool.on('error', err => {
+  console.error('Unexpected Postgres pool error', err);
+});

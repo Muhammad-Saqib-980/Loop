@@ -22,10 +22,23 @@ function mapRow(row: any): UserRow {
 
 export async function createUser(email: string, passwordHash: string): Promise<UserRow> {
   const { rows } = await pool.query(
-    `INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING *`,
+    `INSERT INTO users (email, password_hash) VALUES ($1, $2)
+     ON CONFLICT (email) DO NOTHING
+     RETURNING *`,
     [email.toLowerCase(), passwordHash],
   );
-  return mapRow(rows[0]);
+  if (rows[0]) {
+    return mapRow(rows[0]);
+  }
+  // A concurrent request already created this email between our caller's
+  // existence check and this insert. Re-fetch the existing row rather than
+  // throwing - ON CONFLICT DO NOTHING already guarantees we never overwrite
+  // the existing password hash.
+  const existing = await findUserByEmail(email);
+  if (!existing) {
+    throw new Error(`createUser: conflict on ${email} but no existing row found`);
+  }
+  return existing;
 }
 
 export async function findUserByEmail(email: string): Promise<UserRow | null> {
