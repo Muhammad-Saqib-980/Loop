@@ -115,4 +115,48 @@ describe('tasks API', () => {
       .send({ title: '', priority: 'medium' })
       .expect(400);
   });
+
+  it('returns 404 (not a crash) for a PATCH with a malformed task id', async () => {
+    const app = buildApp();
+    const { header } = await authHeaderFor('malformed-id@example.com');
+
+    // Before the UUID-shape guard was added, this reached findTaskForUser
+    // and Postgres threw a 22P02 "invalid input syntax for type uuid" error
+    // that nothing caught, crashing the process. It must now be a plain 404.
+    await request(app)
+      .patch('/tasks/not-a-uuid')
+      .set('Authorization', header)
+      .send({ title: 'Hijacked' })
+      .expect(404);
+  });
+
+  it('rejects a task with an invalid dueDate instead of crashing the DB insert', async () => {
+    const app = buildApp();
+    const { header } = await authHeaderFor('bad-date@example.com');
+
+    await request(app)
+      .post('/tasks')
+      .set('Authorization', header)
+      .send({ title: 'Bad date', priority: 'medium', dueDate: 'not-a-date' })
+      .expect(400);
+  });
+
+  it('clears a task due date via PATCH with dueDate: null', async () => {
+    const app = buildApp();
+    const { header } = await authHeaderFor('clear-due-date@example.com');
+
+    const created = await request(app)
+      .post('/tasks')
+      .set('Authorization', header)
+      .send({ title: 'Has a due date', priority: 'medium', dueDate: '2030-01-01' })
+      .expect(201);
+    expect(created.body.dueDate).toBe('2030-01-01');
+
+    const cleared = await request(app)
+      .patch(`/tasks/${created.body.id}`)
+      .set('Authorization', header)
+      .send({ dueDate: null })
+      .expect(200);
+    expect(cleared.body.dueDate).toBeNull();
+  });
 });

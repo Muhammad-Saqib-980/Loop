@@ -80,7 +80,7 @@ export async function createTaskForUser(
 
 export interface TaskUpdateRow {
   title?: string;
-  notes?: string;
+  notes?: string | null;
   priority?: Priority;
   dueDate?: string | null;
   recurrence?: Recurrence | null;
@@ -114,7 +114,11 @@ export async function updateTaskForUser(
       taskId,
       userId,
       changes.title !== undefined ? changes.title.trim() : existing.title,
-      changes.notes !== undefined ? changes.notes.trim() || null : existing.notes,
+      changes.notes !== undefined
+        ? changes.notes === null
+          ? null
+          : changes.notes.trim() || null
+        : existing.notes,
       changes.priority ?? existing.priority,
       changes.dueDate !== undefined ? changes.dueDate : existing.dueDate,
       changes.recurrence !== undefined
