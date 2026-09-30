@@ -195,12 +195,22 @@ async function drainQueue(
 
     await withCacheLock(async () => {
       await removeMutation(mutation.id);
-      if (mutation.type === 'create' && updated) {
-        idAliases.set(mutation.taskId, updated.id);
-        await remapTaskId(mutation.taskId, updated.id);
-        await replaceTaskIdInCache(mutation.taskId, updated);
-      } else if (updated) {
-        await replaceTaskIdInCache(updated.id, updated);
+      // The user may have changed this task again while this request was in
+      // flight. The local row already shows that newer change; overwriting
+      // it with this (older) response would flicker it back until the later
+      // mutation drains.
+      const laterQueued = (await listQueue()).some(
+        m => m.taskId === mutation.taskId,
+      );
+      const response = updated;
+      if (mutation.type === 'create' && response) {
+        idAliases.set(mutation.taskId, response.id);
+        await remapTaskId(mutation.taskId, response.id);
+        await replaceTaskIdInCache(mutation.taskId, local =>
+          laterQueued ? {...local, id: response.id} : response,
+        );
+      } else if (response && !laterQueued) {
+        await replaceTaskIdInCache(response.id, () => response);
       } else if (mutation.type === 'delete') {
         await removeTaskFromCache(mutation.taskId);
       }
@@ -260,10 +270,10 @@ function sendMutation(mutation: QueuedMutation): Promise<Task | void> {
 
 async function replaceTaskIdInCache(
   oldId: string,
-  updated: Task,
+  replace: (local: Task) => Task,
 ): Promise<void> {
   const cache = await readCache();
-  await writeCache(cache.map(t => (t.id === oldId ? updated : t)));
+  await writeCache(cache.map(t => (t.id === oldId ? replace(t) : t)));
 }
 
 async function removeTaskFromCache(taskId: string): Promise<void> {

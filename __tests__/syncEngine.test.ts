@@ -431,4 +431,58 @@ describe('syncEngine', () => {
     expect(resolveTaskId('tmp_7')).toBe('real-7');
     expect(resolveTaskId('unrelated')).toBe('unrelated');
   });
+
+  it('keeps a newer local change instead of the drained response when the user acted again mid-flight', async () => {
+    // Toggle #1 is on the wire when the user taps again: the cache must
+    // keep showing toggle #2's optimistic state, not flicker back to the
+    // server's response for #1 while #2 waits for the next pass.
+    mockFetchTasks.mockResolvedValue([serverTask({id: '1'})]);
+    await writeCache([serverTask({id: '1', completed: true})]);
+    await enqueue({type: 'toggle', taskId: '1'});
+    mockToggleTaskApi.mockImplementationOnce(async () => {
+      await writeCache([serverTask({id: '1', completed: false})]);
+      await enqueue({type: 'toggle', taskId: '1'});
+      // Stop the rerun pass from draining toggle #2 so the assertion sees
+      // this pass's result.
+      mockIsOnline.mockResolvedValue(false);
+      return serverTask({
+        id: '1',
+        completed: true,
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    await syncNow();
+
+    expect((await readCache())[0].completed).toBe(false);
+    expect(await listQueue()).toHaveLength(1);
+  });
+
+  it('still remaps the id of a drained create whose task has a later mutation queued', async () => {
+    mockFetchTasks.mockResolvedValue([]);
+    mockCreateTaskApi.mockImplementationOnce(async () => {
+      await writeCache([serverTask({id: 'tmp_1', title: 'Renamed offline'})]);
+      await enqueue({
+        type: 'update',
+        taskId: 'tmp_1',
+        payload: {title: 'Renamed offline', priority: 'low'},
+      });
+      mockIsOnline.mockResolvedValue(false);
+      return serverTask({id: 'real-1', title: 'Original'});
+    });
+    await writeCache([serverTask({id: 'tmp_1', title: 'Original'})]);
+    await enqueue({
+      type: 'create',
+      taskId: 'tmp_1',
+      payload: {title: 'Original', priority: 'low'},
+    });
+
+    await syncNow();
+
+    const cache = await readCache();
+    expect(cache.map(t => [t.id, t.title])).toEqual([
+      ['real-1', 'Renamed offline'],
+    ]);
+    expect((await listQueue()).map(m => m.taskId)).toEqual(['real-1']);
+  });
 });
