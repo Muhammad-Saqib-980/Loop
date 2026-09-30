@@ -2,6 +2,7 @@ import {
   cancelPendingSync,
   initSyncEngine,
   onCacheSynced,
+  resolveTaskId,
   scheduleSync,
   syncNow,
 } from '../src/sync/syncEngine';
@@ -412,5 +413,22 @@ describe('syncEngine', () => {
     await syncNow();
 
     expect(await readCache()).toEqual([]);
+  });
+
+  it("resolveTaskId maps a drained create's temp id to its real id", async () => {
+    mockFetchTasks.mockResolvedValue([]);
+    mockCreateTaskApi.mockResolvedValue(serverTask({id: 'real-7'}));
+    await writeCache([serverTask({id: 'tmp_7'})]);
+    await enqueue({
+      type: 'create',
+      taskId: 'tmp_7',
+      payload: {title: 'A', priority: 'low'},
+    });
+
+    expect(resolveTaskId('tmp_7')).toBe('tmp_7');
+    await syncNow();
+
+    expect(resolveTaskId('tmp_7')).toBe('real-7');
+    expect(resolveTaskId('unrelated')).toBe('unrelated');
   });
 });

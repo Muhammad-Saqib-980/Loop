@@ -30,6 +30,16 @@ let rerunRequested = false;
 // mid-flight can't repopulate a cache that was just cleared.
 let epoch = 0;
 
+// Temp id -> real id for every create drained in this JS runtime. The UI can
+// still be holding a temp id for a moment after drain remaps it (until the
+// onCacheSynced refresh lands); taskStorage resolves ids through this so a
+// tap on that row isn't aimed at a dead id.
+const idAliases = new Map<string, string>();
+
+export function resolveTaskId(id: string): string {
+  return idAliases.get(id) ?? id;
+}
+
 type CacheListener = () => void;
 const cacheListeners = new Set<CacheListener>();
 
@@ -60,6 +70,7 @@ export function scheduleSync(): void {
 
 export function cancelPendingSync(): void {
   epoch++;
+  idAliases.clear();
   if (debounceTimer) {
     clearTimeout(debounceTimer);
     debounceTimer = null;
@@ -185,6 +196,7 @@ async function drainQueue(
     await withCacheLock(async () => {
       await removeMutation(mutation.id);
       if (mutation.type === 'create' && updated) {
+        idAliases.set(mutation.taskId, updated.id);
         await remapTaskId(mutation.taskId, updated.id);
         await replaceTaskIdInCache(mutation.taskId, updated);
       } else if (updated) {
