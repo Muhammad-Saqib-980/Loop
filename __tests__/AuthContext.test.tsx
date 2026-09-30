@@ -6,8 +6,6 @@ import {clearTokens, getTokens, setTokens} from '../src/auth/tokenStorage';
 import {loginApi, logoutApi, registerApi} from '../src/api/auth';
 import {clearLocalTaskCache} from '../src/storage/taskStorage';
 import {setUnauthorizedHandler} from '../src/api/client';
-import {hasPendingMutations, PendingSyncError} from '../src/sync/mutationQueue';
-import {initSyncEngine} from '../src/sync/syncEngine';
 
 jest.mock('../src/auth/tokenStorage');
 jest.mock('../src/api/auth');
@@ -16,13 +14,6 @@ jest.mock('../src/storage/taskStorage', () => ({
 }));
 jest.mock('../src/api/client', () => ({
   setUnauthorizedHandler: jest.fn(),
-}));
-jest.mock('../src/sync/mutationQueue', () => ({
-  hasPendingMutations: jest.fn().mockResolvedValue(false),
-  PendingSyncError: class PendingSyncError extends Error {},
-}));
-jest.mock('../src/sync/syncEngine', () => ({
-  initSyncEngine: jest.fn(() => jest.fn()),
 }));
 
 const mockGetTokens = getTokens as jest.Mock;
@@ -33,8 +24,6 @@ const mockRegisterApi = registerApi as jest.Mock;
 const mockLogoutApi = logoutApi as jest.Mock;
 const mockClearLocalTaskCache = clearLocalTaskCache as jest.Mock;
 const mockSetUnauthorizedHandler = setUnauthorizedHandler as jest.Mock;
-const mockHasPendingMutations = hasPendingMutations as jest.Mock;
-const mockInitSyncEngine = initSyncEngine as jest.Mock;
 
 function Probe() {
   const auth = useAuth();
@@ -44,7 +33,6 @@ function Probe() {
 describe('AuthProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockHasPendingMutations.mockResolvedValue(false);
   });
 
   it('starts loading, then resolves to anonymous when no tokens are stored', async () => {
@@ -171,46 +159,5 @@ describe('AuthProvider', () => {
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => render(<Bare />)).toThrow('useAuth must be used within an AuthProvider');
     consoleError.mockRestore();
-  });
-
-  it('logout rejects with PendingSyncError and does not clear tokens/cache when mutations are pending', async () => {
-    mockGetTokens.mockResolvedValue({accessToken: 'a', refreshToken: 'r'});
-    mockHasPendingMutations.mockResolvedValue(true);
-
-    let auth: ReturnType<typeof useAuth> | null = null;
-    function Capture() {
-      auth = useAuth();
-      return null;
-    }
-    const {getByText} = render(
-      <AuthProvider>
-        <Capture />
-        <Probe />
-      </AuthProvider>,
-    );
-    await waitFor(() => expect(getByText('status:authed')).toBeTruthy());
-
-    await expect(auth!.logout()).rejects.toBeInstanceOf(PendingSyncError);
-
-    expect(mockLogoutApi).not.toHaveBeenCalled();
-    expect(mockClearTokens).not.toHaveBeenCalled();
-    expect(mockClearLocalTaskCache).not.toHaveBeenCalled();
-    expect(getByText('status:authed')).toBeTruthy();
-  });
-
-  it('initializes the sync engine while authed and tears it down when no longer authed', async () => {
-    const cleanup = jest.fn();
-    mockInitSyncEngine.mockReturnValue(cleanup);
-    mockGetTokens.mockResolvedValue({accessToken: 'a', refreshToken: 'r'});
-
-    const {unmount} = render(
-      <AuthProvider>
-        <Probe />
-      </AuthProvider>,
-    );
-    await waitFor(() => expect(mockInitSyncEngine).toHaveBeenCalled());
-
-    unmount();
-    expect(cleanup).toHaveBeenCalled();
   });
 });

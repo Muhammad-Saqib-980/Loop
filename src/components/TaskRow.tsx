@@ -87,13 +87,6 @@ export function TaskRow({
             </Text>
           ) : null}
         </View>
-        {task.pending ? (
-          <View
-            testID="pending-indicator"
-            accessibilityLabel="Not yet synced"
-            style={styles.pendingDot}
-          />
-        ) : null}
       </View>
 
       <TouchableOpacity
@@ -160,13 +153,6 @@ const styles = StyleSheet.create({
   },
   overdue: {
     color: colors.high,
-  },
-  pendingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.subtext,
-    marginTop: 4,
   },
   deleteButton: {
     padding: 6,

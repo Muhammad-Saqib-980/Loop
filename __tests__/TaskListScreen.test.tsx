@@ -5,7 +5,6 @@ import TaskListScreen from '../app/index';
 import {useAuth} from '../src/auth/AuthContext';
 import {addTask, getTasks, subscribeToTasks} from '../src/storage/taskStorage';
 import {todayISODate} from '../src/utils/recurrence';
-import {PendingSyncError} from '../src/sync/mutationQueue';
 
 jest.mock('../src/auth/AuthContext');
 jest.mock('../src/storage/taskStorage');
@@ -32,7 +31,6 @@ describe('TaskListScreen', () => {
         completed: false,
         history: [],
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       },
     ]);
     const {getByText} = render(<TaskListScreen />);
@@ -79,28 +77,6 @@ describe('TaskListScreen', () => {
 
     await waitFor(() => expect(alertSpy).toHaveBeenCalled());
     expect(input.props.value).toBe('Buy milk');
-
-    alertSpy.mockRestore();
-  });
-
-  it('shows a distinct alert and stays logged in when logout is blocked by pending sync', async () => {
-    const logout = jest.fn().mockRejectedValue(new PendingSyncError());
-    mockUseAuth.mockReturnValue({logout, status: 'authed'});
-    mockGetTasks.mockResolvedValue([]);
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-
-    const {getByText} = render(<TaskListScreen />);
-    await waitFor(() =>
-      expect(getByText('Nothing here. Enjoy the quiet.')).toBeTruthy(),
-    );
-    fireEvent.press(getByText('Log out'));
-
-    await waitFor(() =>
-      expect(alertSpy).toHaveBeenCalledWith(
-        'Unsynced changes',
-        'You have unsynced changes — connect to the internet first.',
-      ),
-    );
 
     alertSpy.mockRestore();
   });

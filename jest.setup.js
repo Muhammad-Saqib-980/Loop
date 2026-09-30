@@ -26,8 +26,3 @@ jest.mock('react-native-android-widget', () => {
     requestPinWidget: jest.fn(() => Promise.resolve(false)),
   };
 });
-
-jest.mock('@react-native-community/netinfo', () => ({
-  fetch: jest.fn(() => Promise.resolve({isConnected: true, isInternetReachable: true})),
-  addEventListener: jest.fn(() => () => {}),
-}));

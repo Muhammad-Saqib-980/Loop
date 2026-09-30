@@ -2,28 +2,24 @@ import {widgetTaskHandler} from '../src/widgets/widget-task-handler';
 import {getTasks, toggleTaskComplete} from '../src/storage/taskStorage';
 import {readWidgetCache} from '../src/storage/widgetCache';
 import type {Task} from '../src/types/task';
-import {syncNow} from '../src/sync/syncEngine';
 
 jest.mock('../src/storage/taskStorage');
 jest.mock('../src/storage/widgetCache');
-jest.mock('../src/sync/syncEngine');
-const mockSyncNow = syncNow as jest.Mock;
 
 const mockGetTasks = getTasks as jest.Mock;
 const mockToggleTaskComplete = toggleTaskComplete as jest.Mock;
 const mockReadWidgetCache = readWidgetCache as jest.Mock;
 
-const cachedTask: Task = {id: '1', title: 'Cached', priority: 'medium', completed: false, history: [], createdAt: 't1', updatedAt: 't1'};
-const freshTask: Task = {id: '1', title: 'Fresh', priority: 'medium', completed: false, history: [], createdAt: 't1', updatedAt: 't1'};
+const cachedTask: Task = {id: '1', title: 'Cached', priority: 'medium', completed: false, history: [], createdAt: 't1'};
+const freshTask: Task = {id: '1', title: 'Fresh', priority: 'medium', completed: false, history: [], createdAt: 't1'};
 
 describe('widgetTaskHandler', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('on WIDGET_UPDATE, renders the cached snapshot immediately, drains the queue via syncNow, then re-renders with live data', async () => {
+  it('on WIDGET_UPDATE, renders the cached snapshot immediately, then re-renders with live data', async () => {
     mockReadWidgetCache.mockResolvedValue([cachedTask]);
-    mockSyncNow.mockResolvedValue(undefined);
     let resolveGetTasks: (tasks: Task[]) => void = () => {};
     mockGetTasks.mockReturnValue(new Promise(resolve => {
       resolveGetTasks = resolve;
@@ -37,7 +33,6 @@ describe('widgetTaskHandler', () => {
 
     await handlerPromise;
     expect(renderWidget).toHaveBeenCalledTimes(1);
-    expect(mockSyncNow).toHaveBeenCalled();
 
     resolveGetTasks([freshTask]);
     await new Promise(process.nextTick);
@@ -46,7 +41,6 @@ describe('widgetTaskHandler', () => {
 
   it('on a live-refresh failure, does not throw and keeps only the cached render', async () => {
     mockReadWidgetCache.mockResolvedValue([cachedTask]);
-    mockSyncNow.mockRejectedValue(new Error('network down'));
     mockGetTasks.mockRejectedValue(new Error('network down'));
 
     const renderWidget = jest.fn();
@@ -54,18 +48,6 @@ describe('widgetTaskHandler', () => {
     await new Promise(process.nextTick);
 
     expect(renderWidget).toHaveBeenCalledTimes(1);
-  });
-
-  it('on a failed sync, still re-renders from the local task cache', async () => {
-    mockReadWidgetCache.mockResolvedValue([cachedTask]);
-    mockSyncNow.mockRejectedValue(new Error('network down'));
-    mockGetTasks.mockResolvedValue([freshTask]);
-
-    const renderWidget = jest.fn();
-    await widgetTaskHandler({widgetAction: 'WIDGET_UPDATE', renderWidget} as any);
-    await new Promise(process.nextTick);
-
-    expect(renderWidget).toHaveBeenCalledTimes(2);
   });
 
   it('on WIDGET_CLICK with TOGGLE_TASK, toggles then re-renders from the cache', async () => {
