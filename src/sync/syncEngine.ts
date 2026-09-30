@@ -19,6 +19,23 @@ import {
 import {isOnline, subscribeToConnectivity} from './networkStatus';
 import type {Task} from '../types/task';
 
+// KNOWN LIMITATION: every lock/guard below (withCacheLock, withQueueLock,
+// epoch, idAliases, inFlight) is in-memory, module-level state, so it only
+// serializes syncNow() calls within a single JS runtime. On Android,
+// react-native-android-widget's headless task can execute in a *separate*
+// JS instance from the main app when the app isn't already alive in the
+// foreground. If a widget-triggered sync and the main app's sync both run
+// at nearly the same moment (app just backgrounded but not killed, widget
+// resize/periodic update fires), each process has its own lock/epoch and
+// both could drain the same AsyncStorage-backed mutationQueue entry,
+// producing a duplicate create on the server or two conflicting
+// localTaskCache writes. This is believed low-risk in practice (the
+// headless task typically only spins up when the app process is dead) but
+// is not mitigated by the locking here and is not covered by a test or by
+// the manual-verification checklist, which only exercises this
+// sequentially (see docs/superpowers/manual-verification-phase3.md, step
+// 6). A future fix would need a real cross-process guard (e.g. an
+// AsyncStorage-based mutation "in flight" marker checked/set atomically).
 const DEBOUNCE_MS = 500;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 

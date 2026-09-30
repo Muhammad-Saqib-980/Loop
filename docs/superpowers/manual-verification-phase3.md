@@ -39,3 +39,19 @@ extends it with offline-specific checks.
    reconnecting. Turn off airplane mode and cold-start the app (startup
    fires several syncs at once). Confirm the task appears exactly once,
    both in the app and in the backend's task list — not duplicated.
+
+## Known limitation: widget/app cross-process concurrency
+
+The sync engine's locking (`src/sync/lock.ts`, `syncEngine.ts`'s `epoch`/
+`inFlight`/`idAliases`) only serializes `syncNow()` calls within a single JS
+runtime. On Android, the home-screen widget's headless task can run in a
+*separate* JS process from the main app. If the widget and the main app both
+trigger a sync at nearly the same moment (app just backgrounded but not
+killed, widget resize/periodic update fires), each process has its own
+lock/epoch state and both could drain the same queued mutation, risking a
+duplicate create on the server. This is believed low-risk (the headless task
+typically only runs when the app process is dead) but is untested — step 6
+above only exercises the widget and app sequentially, never concurrently. A
+real fix would need a cross-process guard, e.g. an AsyncStorage-based
+"mutation in flight" marker checked/set atomically. Tracked as a fast-follow,
+not a Phase 3 blocker.
