@@ -26,6 +26,7 @@ function toTask(row: TaskResponse): Task {
     recurrence: row.recurrence ?? undefined,
     history: row.history,
     createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 

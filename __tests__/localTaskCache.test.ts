@@ -1,4 +1,4 @@
-import {clearWidgetCache, readWidgetCache, writeWidgetCache} from '../src/storage/widgetCache';
+import {clearCache, readCache, writeCache} from '../src/sync/localTaskCache';
 import type {Task} from '../src/types/task';
 
 const sampleTask: Task = {
@@ -11,19 +11,19 @@ const sampleTask: Task = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-describe('widgetCache', () => {
+describe('localTaskCache', () => {
   it('returns an empty array when nothing has been cached', async () => {
-    expect(await readWidgetCache()).toEqual([]);
+    expect(await readCache()).toEqual([]);
   });
 
   it('round-trips a written task list', async () => {
-    await writeWidgetCache([sampleTask]);
-    expect(await readWidgetCache()).toEqual([sampleTask]);
+    await writeCache([sampleTask]);
+    expect(await readCache()).toEqual([sampleTask]);
   });
 
   it('clears the cache back to empty', async () => {
-    await writeWidgetCache([sampleTask]);
-    await clearWidgetCache();
-    expect(await readWidgetCache()).toEqual([]);
+    await writeCache([sampleTask]);
+    await clearCache();
+    expect(await readCache()).toEqual([]);
   });
 });

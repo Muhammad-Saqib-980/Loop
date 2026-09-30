@@ -3,6 +3,8 @@ import {clearTokens, getTokens, setTokens} from './tokenStorage';
 import {loginApi, logoutApi, registerApi} from '../api/auth';
 import {clearLocalTaskCache} from '../storage/taskStorage';
 import {setUnauthorizedHandler} from '../api/client';
+import {hasPendingMutations, PendingSyncError} from '../sync/mutationQueue';
+import {initSyncEngine} from '../sync/syncEngine';
 
 export type AuthStatus = 'loading' | 'authed' | 'anonymous';
 
@@ -32,6 +34,13 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
     return () => setUnauthorizedHandler(null);
   }, []);
 
+  useEffect(() => {
+    if (status !== 'authed') {
+      return;
+    }
+    return initSyncEngine();
+  }, [status]);
+
   const login = useCallback(async (email: string, password: string) => {
     const {accessToken, refreshToken} = await loginApi(email, password);
     await setTokens({accessToken, refreshToken});
@@ -43,6 +52,9 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
   }, []);
 
   const logout = useCallback(async () => {
+    if (await hasPendingMutations()) {
+      throw new PendingSyncError();
+    }
     const tokens = await getTokens();
     if (tokens) {
       await logoutApi(tokens.refreshToken).catch(() => {});

@@ -31,6 +31,7 @@ import {
   isTaskDoneToday,
 } from '../src/utils/selectors';
 import {useAuth} from '../src/auth/AuthContext';
+import {PendingSyncError} from '../src/sync/mutationQueue';
 
 type FilterKey = 'today' | 'upcoming' | 'all' | 'completed';
 
@@ -170,7 +171,16 @@ export default function TaskListScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.logoutButton}
-            onPress={() => logout()}>
+            onPress={() =>
+              logout().catch(err => {
+                if (err instanceof PendingSyncError) {
+                  Alert.alert(
+                    'Unsynced changes',
+                    'You have unsynced changes — connect to the internet first.',
+                  );
+                }
+              })
+            }>
             <Text style={styles.widgetButtonText}>Log out</Text>
           </TouchableOpacity>
         </View>
