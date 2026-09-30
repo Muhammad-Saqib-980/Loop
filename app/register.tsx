@@ -1,11 +1,14 @@
-import React, {useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {Link} from 'expo-router';
 import {registerApi} from '../src/api/auth';
+import {AuthLayout} from '../src/components/AuthLayout';
+import {FormInput} from '../src/components/FormInput';
 import {authStyles} from '../src/components/authScreenStyles';
-import {colors} from '../src/theme';
 
 export default function RegisterScreen() {
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -39,9 +42,10 @@ export default function RegisterScreen() {
   }
 
   return (
-    <View style={authStyles.container}>
-      <Text style={authStyles.heading}>Create account</Text>
-
+    <AuthLayout
+      pageTitle="Sign up"
+      title="Create account"
+      subtitle="It's free. You'll confirm your email before your first login.">
       {sent ? (
         <Text style={authStyles.success}>
           If this email can be registered, check your inbox for a verification
@@ -49,31 +53,42 @@ export default function RegisterScreen() {
         </Text>
       ) : (
         <>
-          <TextInput
-            style={authStyles.input}
+          <FormInput
+            label="Email"
             placeholder="Email"
-            placeholderTextColor={colors.subtext}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
+            autoComplete="email"
             keyboardType="email-address"
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
           />
-          <TextInput
-            style={authStyles.input}
+          <FormInput
+            ref={passwordRef}
+            label="Password"
             placeholder="Password"
-            placeholderTextColor={colors.subtext}
             value={password}
             onChangeText={setPassword}
+            autoComplete="new-password"
             secureTextEntry
+            returnKeyType="next"
+            onSubmitEditing={() => confirmRef.current?.focus()}
           />
-          <TextInput
-            style={authStyles.input}
+          <FormInput
+            ref={confirmRef}
+            label="Confirm password"
             placeholder="Confirm password"
-            placeholderTextColor={colors.subtext}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
+            autoComplete="new-password"
             secureTextEntry
+            returnKeyType="go"
+            onSubmitEditing={handleSubmit}
           />
+          <Text style={[authStyles.meta, hintStyle]}>
+            Use at least 8 characters.
+          </Text>
           {error ? <Text style={authStyles.error}>{error}</Text> : null}
           <TouchableOpacity
             style={[authStyles.button, submitting && authStyles.buttonDisabled]}
@@ -92,6 +107,8 @@ export default function RegisterScreen() {
           Log in
         </Link>
       </View>
-    </View>
+    </AuthLayout>
   );
 }
+
+const hintStyle = {fontSize: 12, marginTop: -6, marginBottom: 14};

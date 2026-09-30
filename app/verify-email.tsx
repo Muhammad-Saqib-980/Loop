@@ -1,8 +1,10 @@
 import React, {useEffect, useState} from 'react';
-import {Text, View} from 'react-native';
+import {ActivityIndicator, Text, View} from 'react-native';
 import {Link, useLocalSearchParams} from 'expo-router';
 import {verifyEmailApi} from '../src/api/auth';
+import {AuthLayout} from '../src/components/AuthLayout';
 import {authStyles} from '../src/components/authScreenStyles';
+import {colors} from '../src/theme';
 
 export default function VerifyEmailScreen() {
   const {token} = useLocalSearchParams<{token?: string}>();
@@ -21,10 +23,15 @@ export default function VerifyEmailScreen() {
   }, [token]);
 
   return (
-    <View style={authStyles.container}>
-      <Text style={authStyles.heading}>Verify email</Text>
+    <AuthLayout
+      pageTitle="Verify email"
+      title="Verify email"
+      subtitle="Confirming the link from your inbox.">
       {status === 'checking' ? (
-        <Text style={authStyles.noticeText}>Verifying your email...</Text>
+        <View style={checkingRow}>
+          <ActivityIndicator color={colors.accent} />
+          <Text style={authStyles.meta}>Verifying your email...</Text>
+        </View>
       ) : status === 'success' ? (
         <Text style={authStyles.success}>
           Your email is verified. You can log in now.
@@ -34,9 +41,22 @@ export default function VerifyEmailScreen() {
           This verification link is invalid or has expired.
         </Text>
       )}
-      <Link href="/login" style={authStyles.link}>
+      <Link
+        href="/login"
+        style={[
+          authStyles.button,
+          authStyles.buttonText,
+          authStyles.buttonLink,
+        ]}>
         Go to login
       </Link>
-    </View>
+    </AuthLayout>
   );
 }
+
+const checkingRow = {
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  gap: 10,
+  marginBottom: 16,
+};

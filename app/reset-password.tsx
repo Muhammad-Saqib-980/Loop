@@ -1,9 +1,10 @@
 import React, {useState} from 'react';
-import {Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Text, TouchableOpacity} from 'react-native';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {resetPasswordApi} from '../src/api/auth';
+import {AuthLayout} from '../src/components/AuthLayout';
+import {FormInput} from '../src/components/FormInput';
 import {authStyles} from '../src/components/authScreenStyles';
-import {colors} from '../src/theme';
 
 export default function ResetPasswordScreen() {
   const {token} = useLocalSearchParams<{token?: string}>();
@@ -40,22 +41,25 @@ export default function ResetPasswordScreen() {
   }
 
   return (
-    <View style={authStyles.container}>
-      <Text style={authStyles.heading}>Reset password</Text>
-
+    <AuthLayout
+      pageTitle="Reset password"
+      title="Reset password"
+      subtitle="Choose a new password with at least 8 characters.">
       {success ? (
         <Text style={authStyles.success}>
           Password updated. Redirecting to login...
         </Text>
       ) : (
         <>
-          <TextInput
-            style={authStyles.input}
+          <FormInput
+            label="New password"
             placeholder="New password"
-            placeholderTextColor={colors.subtext}
             value={password}
             onChangeText={setPassword}
+            autoComplete="new-password"
             secureTextEntry
+            returnKeyType="go"
+            onSubmitEditing={handleSubmit}
           />
           {error ? <Text style={authStyles.error}>{error}</Text> : null}
           <TouchableOpacity
@@ -68,6 +72,6 @@ export default function ResetPasswordScreen() {
           </TouchableOpacity>
         </>
       )}
-    </View>
+    </AuthLayout>
   );
 }

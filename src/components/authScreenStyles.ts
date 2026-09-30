@@ -2,42 +2,35 @@ import {StyleSheet} from 'react-native';
 import {colors} from '../theme';
 
 export const authStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    padding: 24,
-    justifyContent: 'center',
-  },
-  heading: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: 24,
-  },
-  input: {
-    backgroundColor: colors.card,
-    color: colors.text,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    marginBottom: 12,
-  },
   error: {
     color: colors.high,
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     fontSize: 13,
-    marginBottom: 12,
+    lineHeight: 18,
+    marginBottom: 14,
+    overflow: 'hidden',
   },
   success: {
     color: colors.success,
-    fontSize: 13,
-    marginBottom: 12,
+    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+    overflow: 'hidden',
   },
   notice: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderWidth: 1,
     borderRadius: 12,
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   noticeText: {
     color: colors.subtext,
@@ -49,7 +42,12 @@ export const authStyles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
+    marginTop: 4,
     marginBottom: 16,
+  },
+  buttonLink: {
+    textAlign: 'center',
+    overflow: 'hidden',
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -61,16 +59,27 @@ export const authStyles = StyleSheet.create({
   },
   link: {
     color: colors.accent,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
+  },
+  centeredLink: {
+    alignSelf: 'center',
+  },
+  rightLink: {
+    alignSelf: 'flex-end',
+    marginTop: -6,
+    marginBottom: 14,
   },
   row: {
     flexDirection: 'row',
-    marginTop: 12,
     justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 18,
+    marginTop: 4,
   },
   meta: {
     color: colors.subtext,
-    fontSize: 13,
+    fontSize: 14,
   },
 });
