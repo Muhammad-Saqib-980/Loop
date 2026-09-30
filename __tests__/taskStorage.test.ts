@@ -32,8 +32,8 @@ const mockWriteWidgetCache = writeWidgetCache as jest.Mock;
 const mockClearWidgetCache = clearWidgetCache as jest.Mock;
 const mockSyncWidget = syncWidget as jest.Mock;
 
-const task1: Task = {id: '1', title: 'One', priority: 'medium', completed: false, history: [], createdAt: 't1'};
-const task2: Task = {id: '2', title: 'Two', priority: 'low', completed: false, history: [], createdAt: 't2'};
+const task1: Task = {id: '1', title: 'One', priority: 'medium', completed: false, history: [], createdAt: 't1', updatedAt: 't1'};
+const task2: Task = {id: '2', title: 'Two', priority: 'low', completed: false, history: [], createdAt: 't2', updatedAt: 't2'};
 
 describe('taskStorage (API-backed)', () => {
   beforeEach(() => {

@@ -31,6 +31,7 @@ describe('TaskListScreen', () => {
         completed: false,
         history: [],
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       },
     ]);
     const {getByText} = render(<TaskListScreen />);

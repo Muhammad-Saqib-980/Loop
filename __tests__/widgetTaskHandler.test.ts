@@ -10,8 +10,8 @@ const mockGetTasks = getTasks as jest.Mock;
 const mockToggleTaskComplete = toggleTaskComplete as jest.Mock;
 const mockReadWidgetCache = readWidgetCache as jest.Mock;
 
-const cachedTask: Task = {id: '1', title: 'Cached', priority: 'medium', completed: false, history: [], createdAt: 't1'};
-const freshTask: Task = {id: '1', title: 'Fresh', priority: 'medium', completed: false, history: [], createdAt: 't1'};
+const cachedTask: Task = {id: '1', title: 'Cached', priority: 'medium', completed: false, history: [], createdAt: 't1', updatedAt: 't1'};
+const freshTask: Task = {id: '1', title: 'Fresh', priority: 'medium', completed: false, history: [], createdAt: 't1', updatedAt: 't1'};
 
 describe('widgetTaskHandler', () => {
   beforeEach(() => {

@@ -10,6 +10,7 @@ function makeRepeatingTask(overrides: Partial<Task> = {}): Task {
     completed: false,
     history: [],
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     recurrence: {type: 'weekly', interval: 1, daysOfWeek: [1, 3, 5]},
     ...overrides,
   };

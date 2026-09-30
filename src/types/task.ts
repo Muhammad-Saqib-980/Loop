@@ -19,6 +19,9 @@ export interface Task {
   recurrence?: Recurrence;
   history: string[];
   createdAt: string;
+  updatedAt: string;
+  /** Derived client-side: true while a queued, not-yet-synced mutation exists for this task. Never persisted to the API. */
+  pending?: boolean;
 }
 
 export type NewTaskInput = {
