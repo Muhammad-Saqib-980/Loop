@@ -1,6 +1,5 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {
-  Alert,
   FlatList,
   Platform,
   StatusBar,
@@ -13,6 +12,7 @@ import {
 import {LogoMark} from '../src/components/LogoMark';
 import {TaskEditorModal} from '../src/components/TaskEditorModal';
 import {TaskRow} from '../src/components/TaskRow';
+import {showAlert} from '../src/utils/alert';
 import {
   addTask,
   deleteTask,
@@ -97,7 +97,7 @@ export default function TaskListScreen() {
       dueDate: todayISODate(),
     }).catch(() => {
       setQuickTitle(title);
-      Alert.alert(
+      showAlert(
         'Could not add task',
         'Please check your connection and try again.',
       );
@@ -119,7 +119,7 @@ export default function TaskListScreen() {
       ? updateTask(editingTask.id, input)
       : addTask(input);
     action.catch(() => {
-      Alert.alert(
+      showAlert(
         'Could not save task',
         'Please check your connection and try again.',
       );
@@ -130,7 +130,7 @@ export default function TaskListScreen() {
   function handleDelete() {
     if (editingTask) {
       deleteTask(editingTask.id).catch(() => {
-        Alert.alert(
+        showAlert(
           'Could not delete task',
           'Please check your connection and try again.',
         );
@@ -143,7 +143,7 @@ export default function TaskListScreen() {
     if (Platform.OS !== 'android') {
       return;
     }
-    Alert.alert(
+    showAlert(
       'Add the Todo widget',
       'Long-press an empty spot on your home screen, choose Widgets, then drag the Todo widget onto the screen.',
     );
@@ -174,7 +174,7 @@ export default function TaskListScreen() {
             onPress={() =>
               logout().catch(err => {
                 if (err instanceof PendingSyncError) {
-                  Alert.alert(
+                  showAlert(
                     'Unsynced changes',
                     'You have unsynced changes — connect to the internet first.',
                   );
@@ -244,7 +244,7 @@ export default function TaskListScreen() {
             }
             onToggle={() =>
               toggleTaskComplete(item.id).catch(() => {
-                Alert.alert(
+                showAlert(
                   'Could not update task',
                   'Please check your connection and try again.',
                 );
@@ -253,7 +253,7 @@ export default function TaskListScreen() {
             onPress={() => openEditor(item)}
             onDelete={() =>
               deleteTask(item.id).catch(() => {
-                Alert.alert(
+                showAlert(
                   'Could not delete task',
                   'Please check your connection and try again.',
                 );

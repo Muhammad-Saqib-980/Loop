@@ -1,6 +1,5 @@
 import React, {useEffect, useState} from 'react';
 import {
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import type {NewTaskInput, Priority, Recurrence, RecurrenceType, Task} from '../types/task';
 import {toISODate, todayISODate} from '../utils/recurrence';
+import {confirmDestructive, showAlert} from '../utils/alert';
 import {colors} from '../theme';
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high'];
@@ -67,7 +67,7 @@ export function TaskEditorModal({
 
   function handleSave() {
     if (!title.trim()) {
-      Alert.alert('Give it a title', 'Tasks need at least a short title.');
+      showAlert('Give it a title', 'Tasks need at least a short title.');
       return;
     }
 
@@ -90,10 +90,10 @@ export function TaskEditorModal({
   }
 
   function confirmDelete() {
-    Alert.alert('Delete task?', title, [
-      {text: 'Cancel', style: 'cancel'},
-      {text: 'Delete', style: 'destructive', onPress: onDelete},
-    ]);
+    if (!onDelete) {
+      return;
+    }
+    confirmDestructive('Delete task?', title, 'Delete', onDelete);
   }
 
   return (
