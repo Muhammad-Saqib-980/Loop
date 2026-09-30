@@ -15,7 +15,10 @@ describe('networkStatus', () => {
   });
 
   it('isOnline resolves false when not connected', async () => {
-    mockFetch.mockResolvedValue({isConnected: false, isInternetReachable: false});
+    mockFetch.mockResolvedValue({
+      isConnected: false,
+      isInternetReachable: false,
+    });
     expect(await isOnline()).toBe(false);
   });
 

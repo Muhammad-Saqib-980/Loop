@@ -16,7 +16,11 @@ export function applyOptimisticToggle(task: Task): Task {
   const alreadyDoneToday = task.history.includes(today);
 
   if (alreadyDoneToday) {
-    return {...task, history: task.history.filter(d => d !== today), updatedAt: now};
+    return {
+      ...task,
+      history: task.history.filter(d => d !== today),
+      updatedAt: now,
+    };
   }
 
   const nextDue = computeNextDueDate(task.recurrence, today);
