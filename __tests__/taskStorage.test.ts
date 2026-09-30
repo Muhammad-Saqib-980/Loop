@@ -1,180 +1,280 @@
-import {
-  addTask,
-  clearLocalTaskCache,
-  deleteTask,
-  getTasks,
-  subscribeToTasks,
-  toggleTaskComplete,
-  updateTask,
-} from '../src/storage/taskStorage';
-import {
-  createTaskApi,
-  deleteTaskApi,
-  fetchTasks,
-  toggleTaskApi,
-  updateTaskApi,
-} from '../src/api/tasks';
-import {clearWidgetCache, writeWidgetCache} from '../src/storage/widgetCache';
-import {syncWidget} from '../src/widgets/syncWidget';
 import type {Task} from '../src/types/task';
 import {Platform} from 'react-native';
 
-jest.mock('../src/api/tasks');
+jest.mock('../src/sync/localTaskCache');
+jest.mock('../src/sync/mutationQueue');
+jest.mock('../src/sync/syncEngine');
+jest.mock('../src/sync/optimisticToggle');
 jest.mock('../src/storage/widgetCache');
 jest.mock('../src/widgets/syncWidget');
 
-const mockFetchTasks = fetchTasks as jest.Mock;
-const mockCreateTaskApi = createTaskApi as jest.Mock;
-const mockUpdateTaskApi = updateTaskApi as jest.Mock;
-const mockDeleteTaskApi = deleteTaskApi as jest.Mock;
-const mockToggleTaskApi = toggleTaskApi as jest.Mock;
-const mockWriteWidgetCache = writeWidgetCache as jest.Mock;
-const mockClearWidgetCache = clearWidgetCache as jest.Mock;
-const mockSyncWidget = syncWidget as jest.Mock;
+const task1: Task = {
+  id: '1',
+  title: 'One',
+  priority: 'medium',
+  completed: false,
+  history: [],
+  createdAt: 't1',
+  updatedAt: 't1',
+};
+const task2: Task = {
+  id: '2',
+  title: 'Two',
+  priority: 'low',
+  completed: false,
+  history: [],
+  createdAt: 't2',
+  updatedAt: 't2',
+};
 
-const task1: Task = {id: '1', title: 'One', priority: 'medium', completed: false, history: [], createdAt: 't1'};
-const task2: Task = {id: '2', title: 'Two', priority: 'low', completed: false, history: [], createdAt: 't2'};
+describe('taskStorage (offline-first orchestrator)', () => {
+  let storage: typeof import('../src/storage/taskStorage');
+  let localTaskCache: typeof import('../src/sync/localTaskCache');
+  let mutationQueue: typeof import('../src/sync/mutationQueue');
+  let syncEngine: typeof import('../src/sync/syncEngine');
+  let optimisticToggle: typeof import('../src/sync/optimisticToggle');
+  let widgetCache: typeof import('../src/storage/widgetCache');
+  let syncWidgetModule: typeof import('../src/widgets/syncWidget');
 
-describe('taskStorage (API-backed)', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    mockWriteWidgetCache.mockResolvedValue(undefined);
-    mockClearWidgetCache.mockResolvedValue(undefined);
-    mockSyncWidget.mockResolvedValue(undefined);
-  });
+    jest.resetModules();
+    storage = require('../src/storage/taskStorage');
+    localTaskCache = require('../src/sync/localTaskCache');
+    mutationQueue = require('../src/sync/mutationQueue');
+    syncEngine = require('../src/sync/syncEngine');
+    optimisticToggle = require('../src/sync/optimisticToggle');
+    widgetCache = require('../src/storage/widgetCache');
+    syncWidgetModule = require('../src/widgets/syncWidget');
 
-  afterEach(() => {
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([]);
+    (localTaskCache.writeCache as jest.Mock).mockResolvedValue(undefined);
+    (localTaskCache.clearCache as jest.Mock).mockResolvedValue(undefined);
+    (mutationQueue.listQueue as jest.Mock).mockResolvedValue([]);
+    (mutationQueue.enqueue as jest.Mock).mockResolvedValue(undefined);
+    (mutationQueue.clearQueue as jest.Mock).mockResolvedValue(undefined);
+    (syncEngine.syncNow as jest.Mock).mockResolvedValue(undefined);
+    (syncEngine.scheduleSync as jest.Mock).mockReturnValue(undefined);
+    (syncEngine.resolveTaskId as jest.Mock).mockImplementation(
+      (id: string) => id,
+    );
+    (widgetCache.writeWidgetCache as jest.Mock).mockResolvedValue(undefined);
+    (widgetCache.clearWidgetCache as jest.Mock).mockResolvedValue(undefined);
+    (syncWidgetModule.syncWidget as jest.Mock).mockResolvedValue(undefined);
     (Platform as any).OS = 'ios';
   });
 
-  it('getTasks fetches from the API and notifies subscribers', async () => {
-    mockFetchTasks.mockResolvedValue([task1, task2]);
-    const listener = jest.fn();
-    subscribeToTasks(listener);
+  it('getTasks reads from the local cache, tags pending: false when nothing is queued, and triggers a background sync', async () => {
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([task1, task2]);
 
-    const result = await getTasks();
+    const result = await storage.getTasks();
 
-    expect(result).toEqual([task1, task2]);
-    expect(listener).toHaveBeenCalledWith([task1, task2]);
-    expect(mockWriteWidgetCache).toHaveBeenCalledWith([task1, task2]);
+    expect(result).toEqual([
+      {...task1, pending: false},
+      {...task2, pending: false},
+    ]);
+    expect(syncEngine.syncNow).toHaveBeenCalled();
   });
 
-  it('addTask prepends the created task to the in-memory cache and notifies', async () => {
-    mockFetchTasks.mockResolvedValue([task1]);
-    await getTasks();
-    mockCreateTaskApi.mockResolvedValue(task2);
+  it('addTask applies optimistically to the cache before any network call resolves, and enqueues + schedules sync', async () => {
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([task1]);
+    await storage.getTasks();
 
     const listener = jest.fn();
-    subscribeToTasks(listener);
-    const created = await addTask({title: 'Two', priority: 'low'});
+    storage.subscribeToTasks(listener);
+    listener.mockClear();
 
-    expect(created).toEqual(task2);
-    expect(listener).toHaveBeenCalledWith([task2, task1]);
+    const created = await storage.addTask({title: 'New', priority: 'low'});
+
+    expect(created.title).toBe('New');
+    expect(created.id).toMatch(/^tmp_/);
+    expect(listener).toHaveBeenCalled();
+    const notified = listener.mock.calls[0][0] as Task[];
+    expect(notified.map(t => t.title)).toEqual(['New', 'One']);
+    expect(syncEngine.scheduleSync).toHaveBeenCalled();
+    expect(mutationQueue.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({type: 'create', taskId: created.id}),
+    );
+    expect(localTaskCache.writeCache).toHaveBeenCalledWith([
+      expect.objectContaining({id: created.id, title: 'New'}),
+      expect.objectContaining({id: '1'}),
+    ]);
   });
 
-  it('updateTask replaces the matching task in the cache', async () => {
-    mockFetchTasks.mockResolvedValue([task1]);
-    await getTasks();
-    const updated = {...task1, title: 'One (edited)'};
-    mockUpdateTaskApi.mockResolvedValue(updated);
-
-    await updateTask('1', {title: 'One (edited)', priority: 'medium'});
-
-    const listener = jest.fn();
-    subscribeToTasks(listener);
-    expect(listener).toHaveBeenCalledWith([updated]);
-  });
-
-  it('deleteTask removes the task from the cache', async () => {
-    mockFetchTasks.mockResolvedValue([task1, task2]);
-    await getTasks();
-    mockDeleteTaskApi.mockResolvedValue(undefined);
-
-    await deleteTask('1');
-
-    const listener = jest.fn();
-    subscribeToTasks(listener);
-    expect(listener).toHaveBeenCalledWith([task2]);
-  });
-
-  it('toggleTaskComplete replaces the task with the server response', async () => {
-    mockFetchTasks.mockResolvedValue([task1]);
-    await getTasks();
-    const toggled = {...task1, completed: true};
-    mockToggleTaskApi.mockResolvedValue(toggled);
-
-    await toggleTaskComplete('1');
-
-    const listener = jest.fn();
-    subscribeToTasks(listener);
-    expect(listener).toHaveBeenCalledWith([toggled]);
-  });
-
-  it('subscribeToTasks immediately pushes the current cache to a new listener', async () => {
-    mockFetchTasks.mockResolvedValue([task1]);
-    await getTasks();
-
-    const listener = jest.fn();
-    subscribeToTasks(listener);
-    expect(listener).toHaveBeenCalledWith([task1]);
-  });
-
-  it('clearLocalTaskCache resets the in-memory cache, notifies with an empty list, and clears the widget cache', async () => {
-    mockFetchTasks.mockResolvedValue([task1]);
-    await getTasks();
-
-    await clearLocalTaskCache();
-
-    expect(mockClearWidgetCache).toHaveBeenCalled();
-    const listener = jest.fn();
-    subscribeToTasks(listener);
-    expect(listener).toHaveBeenCalledWith([]);
-  });
-
-  it('toggleTaskComplete refetches the full list when the in-memory cache has not been loaded yet (cold start)', async () => {
-    // No prior getTasks() call — cache starts null, matching a fresh headless
-    // JS runtime such as the widget's background task handler. The module-level
-    // cache persists across tests in this file, so load a fresh copy of
-    // taskStorage (and its mocked deps) to guarantee cache === null here.
-    let storage!: typeof import('../src/storage/taskStorage');
-    let api!: typeof import('../src/api/tasks');
-    let widgetCache!: typeof import('../src/storage/widgetCache');
-    jest.isolateModules(() => {
-      storage = require('../src/storage/taskStorage');
-      api = require('../src/api/tasks');
-      widgetCache = require('../src/storage/widgetCache');
+  it('updateTask applies the change locally, marks the task pending, and enqueues an update mutation', async () => {
+    // A stateful fake, not a fixed mockResolvedValue: this is what actually
+    // proves enqueue happens BEFORE persistAndNotify recomputes each task's
+    // pending flag. A fixed return value would pass even if that ordering
+    // regressed (e.g. notify-then-enqueue), silently showing pending:false
+    // on a task's own first render after being edited.
+    let queued: Array<{taskId: string}> = [];
+    (mutationQueue.enqueue as jest.Mock).mockImplementation(async m => {
+      queued.push(m);
     });
-    const isoFetchTasks = api.fetchTasks as jest.Mock;
-    const isoToggleTaskApi = api.toggleTaskApi as jest.Mock;
-    const isoWriteWidgetCache = widgetCache.writeWidgetCache as jest.Mock;
-    isoWriteWidgetCache.mockResolvedValue(undefined);
+    (mutationQueue.listQueue as jest.Mock).mockImplementation(
+      async () => queued,
+    );
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([task1]);
+    await storage.getTasks();
 
+    const listener = jest.fn();
+    storage.subscribeToTasks(listener);
+    listener.mockClear();
+
+    await storage.updateTask('1', {title: 'One (edited)', priority: 'medium'});
+
+    expect(mutationQueue.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({type: 'update', taskId: '1'}),
+    );
+    const notified = listener.mock.calls[0][0] as Task[];
+    const updated = notified.find(t => t.id === '1')!;
+    expect(updated.title).toBe('One (edited)');
+    expect(updated.pending).toBe(true);
+  });
+
+  it('deleteTask removes the task from the cache and enqueues a delete mutation', async () => {
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([task1, task2]);
+    await storage.getTasks();
+
+    const listener = jest.fn();
+    storage.subscribeToTasks(listener);
+    listener.mockClear();
+
+    await storage.deleteTask('1');
+
+    const notified = listener.mock.calls[0][0] as Task[];
+    expect(notified.map(t => t.id)).toEqual(['2']);
+    expect(mutationQueue.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({type: 'delete', taskId: '1'}),
+    );
+  });
+
+  it("toggleTaskComplete applies applyOptimisticToggle's result locally and enqueues a toggle mutation", async () => {
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([task1]);
+    await storage.getTasks();
     const toggled = {...task1, completed: true};
-    isoToggleTaskApi.mockResolvedValue(toggled);
-    isoFetchTasks.mockResolvedValue([toggled, task2]);
+    (optimisticToggle.applyOptimisticToggle as jest.Mock).mockReturnValue(
+      toggled,
+    );
+
+    const listener = jest.fn();
+    storage.subscribeToTasks(listener);
+    listener.mockClear();
 
     await storage.toggleTaskComplete('1');
 
-    expect(isoFetchTasks).toHaveBeenCalled();
-    expect(isoWriteWidgetCache).toHaveBeenCalledWith([toggled, task2]);
+    expect(optimisticToggle.applyOptimisticToggle).toHaveBeenCalledWith(task1);
+    const notified = listener.mock.calls[0][0] as Task[];
+    expect(notified.find(t => t.id === '1')!.completed).toBe(true);
+    expect(mutationQueue.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({type: 'toggle', taskId: '1'}),
+    );
   });
 
-  it('getTasks syncs the widget on Android after a fetch', async () => {
-    (Platform as any).OS = 'android';
-    mockFetchTasks.mockResolvedValue([task1]);
+  it('toggleTaskComplete is a no-op when the task id is not in the cache', async () => {
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([task1]);
+    await storage.getTasks();
 
-    await getTasks();
+    await storage.toggleTaskComplete('does-not-exist');
 
-    expect(mockSyncWidget).toHaveBeenCalledWith([task1]);
+    expect(mutationQueue.enqueue).not.toHaveBeenCalled();
+    expect(localTaskCache.writeCache).not.toHaveBeenCalled();
   });
 
-  it('clearLocalTaskCache syncs the widget with an empty list on Android', async () => {
+  it('subscribeToTasks immediately pushes the current cache to a new listener', async () => {
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([task1]);
+    await storage.getTasks();
+
+    const listener = jest.fn();
+    storage.subscribeToTasks(listener);
+    expect(listener).toHaveBeenCalledWith([{...task1, pending: false}]);
+  });
+
+  it('clearLocalTaskCache empties the local cache and the mutation queue, and clears the widget cache', async () => {
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([task1]);
+    await storage.getTasks();
+
+    await storage.clearLocalTaskCache();
+
+    expect(localTaskCache.clearCache).toHaveBeenCalled();
+    expect(mutationQueue.clearQueue).toHaveBeenCalled();
+    expect(widgetCache.clearWidgetCache).toHaveBeenCalled();
+    const listener = jest.fn();
+    storage.subscribeToTasks(listener);
+    expect(listener).toHaveBeenCalledWith([]);
+  });
+
+  it('getTasks syncs the widget on Android', async () => {
     (Platform as any).OS = 'android';
-    mockFetchTasks.mockResolvedValue([task1]);
-    await getTasks();
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([task1]);
 
-    await clearLocalTaskCache();
+    await storage.getTasks();
 
-    expect(mockSyncWidget).toHaveBeenCalledWith([]);
+    expect(syncWidgetModule.syncWidget).toHaveBeenCalledWith([
+      {...task1, pending: false},
+    ]);
+  });
+
+  it('does not sync the widget on iOS/web', async () => {
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([task1]);
+
+    await storage.getTasks();
+
+    expect(syncWidgetModule.syncWidget).not.toHaveBeenCalled();
+    expect(widgetCache.writeWidgetCache).toHaveBeenCalledWith([
+      {...task1, pending: false},
+    ]);
+  });
+
+  it('re-reads the local cache and notifies listeners when a sync pass completes', async () => {
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([task1]);
+    await storage.getTasks();
+    const listener = jest.fn();
+    storage.subscribeToTasks(listener);
+    listener.mockClear();
+
+    const synced = {...task1, id: 'real-1'};
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([synced]);
+    const onSynced = (syncEngine.onCacheSynced as jest.Mock).mock.calls[0][0];
+    onSynced();
+
+    await new Promise(process.nextTick);
+    expect(listener).toHaveBeenCalledWith([{...synced, pending: false}]);
+  });
+
+  it('mutators apply to the freshly-read cache, so a change made by a sync pass is not overwritten', async () => {
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([task1]);
+    await storage.getTasks();
+    // A sync pass has since remapped/added rows in the persisted cache.
+    const synced = {...task1, id: 'real-1'};
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([synced, task2]);
+
+    await storage.deleteTask('2');
+
+    expect(localTaskCache.writeCache).toHaveBeenLastCalledWith([synced]);
+  });
+
+  it('clearLocalTaskCache cancels any in-flight sync before clearing', async () => {
+    await storage.clearLocalTaskCache();
+
+    expect(syncEngine.cancelPendingSync).toHaveBeenCalled();
+  });
+
+  it('resolves a stale temp id to its synced real id before mutating', async () => {
+    const synced = {...task1, id: 'real-1'};
+    (localTaskCache.readCache as jest.Mock).mockResolvedValue([synced]);
+    (syncEngine.resolveTaskId as jest.Mock).mockImplementation((id: string) =>
+      id === 'tmp_1' ? 'real-1' : id,
+    );
+    (optimisticToggle.applyOptimisticToggle as jest.Mock).mockReturnValue({
+      ...synced,
+      completed: true,
+    });
+
+    await storage.toggleTaskComplete('tmp_1');
+
+    expect(optimisticToggle.applyOptimisticToggle).toHaveBeenCalledWith(synced);
+    expect(mutationQueue.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({type: 'toggle', taskId: 'real-1'}),
+    );
   });
 });

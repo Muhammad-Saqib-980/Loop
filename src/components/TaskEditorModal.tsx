@@ -19,8 +19,8 @@ import type {
   Task,
 } from '../types/task';
 import {toISODate, todayISODate} from '../utils/recurrence';
+import {confirmDestructive} from '../utils/alert';
 import {colors} from '../theme';
-import {confirmDestructive} from '../utils/notify';
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high'];
 const RECURRENCE_TYPES: RecurrenceType[] = ['daily', 'weekly', 'monthly'];
@@ -105,9 +105,10 @@ export function TaskEditorModal({
   }
 
   function confirmDelete() {
-    if (onDelete) {
-      confirmDestructive('Delete task?', title, 'Delete', onDelete);
+    if (!onDelete) {
+      return;
     }
+    confirmDestructive('Delete task?', title, 'Delete', onDelete);
   }
 
   return (

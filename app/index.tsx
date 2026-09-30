@@ -24,7 +24,7 @@ import {
 } from '../src/storage/taskStorage';
 import {colors} from '../src/theme';
 import type {NewTaskInput, Task} from '../src/types/task';
-import {showAlert} from '../src/utils/notify';
+import {showAlert} from '../src/utils/alert';
 import {todayISODate} from '../src/utils/recurrence';
 import {
   getCompletedTasks,
@@ -34,6 +34,7 @@ import {
 } from '../src/utils/selectors';
 import {usePageTitle} from '../src/utils/usePageTitle';
 import {useAuth} from '../src/auth/AuthContext';
+import {PendingSyncError} from '../src/sync/mutationQueue';
 
 type FilterKey = 'today' | 'upcoming' | 'all' | 'completed';
 
@@ -137,6 +138,17 @@ export default function TaskListScreen() {
       );
     }
     closeEditor();
+  }
+
+  function handleLogout() {
+    logout().catch(err => {
+      if (err instanceof PendingSyncError) {
+        showAlert(
+          'Unsynced changes',
+          'You have unsynced changes — connect to the internet first.',
+        );
+      }
+    });
   }
 
   function handleAddWidget() {
@@ -278,9 +290,7 @@ export default function TaskListScreen() {
             );
           })}
           <View style={styles.sidebarSpacer} />
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={() => logout()}>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.logoutButtonText}>Log out</Text>
           </TouchableOpacity>
         </View>
@@ -325,9 +335,7 @@ export default function TaskListScreen() {
                 <Text style={styles.pillButtonText}>+ Widget</Text>
               </TouchableOpacity>
             ) : null}
-            <TouchableOpacity
-              style={styles.pillButton}
-              onPress={() => logout()}>
+            <TouchableOpacity style={styles.pillButton} onPress={handleLogout}>
               <Text style={styles.pillButtonText}>Log out</Text>
             </TouchableOpacity>
           </View>
