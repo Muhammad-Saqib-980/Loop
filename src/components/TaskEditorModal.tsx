@@ -7,11 +7,19 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import type {NewTaskInput, Priority, Recurrence, RecurrenceType, Task} from '../types/task';
+import {FormInput} from './FormInput';
+import type {
+  NewTaskInput,
+  Priority,
+  Recurrence,
+  RecurrenceType,
+  Task,
+} from '../types/task';
 import {toISODate, todayISODate} from '../utils/recurrence';
-import {confirmDestructive, showAlert} from '../utils/alert';
+import {confirmDestructive} from '../utils/alert';
 import {colors} from '../theme';
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high'];
@@ -45,6 +53,9 @@ export function TaskEditorModal({
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('daily');
   const [interval, setIntervalValue] = useState('1');
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
+  const [titleError, setTitleError] = useState(false);
+  const {width} = useWindowDimensions();
+  const isDialog = width >= 700;
 
   useEffect(() => {
     if (visible) {
@@ -56,6 +67,7 @@ export function TaskEditorModal({
       setRecurrenceType(task?.recurrence?.type ?? 'daily');
       setIntervalValue(String(task?.recurrence?.interval ?? 1));
       setDaysOfWeek(task?.recurrence?.daysOfWeek ?? []);
+      setTitleError(false);
     }
   }, [visible, task]);
 
@@ -67,7 +79,7 @@ export function TaskEditorModal({
 
   function handleSave() {
     if (!title.trim()) {
-      showAlert('Give it a title', 'Tasks need at least a short title.');
+      setTitleError(true);
       return;
     }
 
@@ -76,7 +88,10 @@ export function TaskEditorModal({
       recurrence = {
         type: recurrenceType,
         interval: Math.max(1, parseInt(interval, 10) || 1),
-        daysOfWeek: recurrenceType === 'weekly' && daysOfWeek.length > 0 ? daysOfWeek : undefined,
+        daysOfWeek:
+          recurrenceType === 'weekly' && daysOfWeek.length > 0
+            ? daysOfWeek
+            : undefined,
       };
     }
 
@@ -97,25 +112,39 @@ export function TaskEditorModal({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+    <Modal
+      visible={visible}
+      animationType={isDialog ? 'fade' : 'slide'}
+      transparent
+      onRequestClose={onClose}>
+      <View style={[styles.backdrop, isDialog && styles.backdropDialog]}>
+        <View style={[styles.sheet, isDialog && styles.sheetDialog]}>
           <ScrollView keyboardShouldPersistTaps="handled">
-            <Text style={styles.heading}>{task ? 'Edit task' : 'New task'}</Text>
+            <Text style={styles.heading}>
+              {task ? 'Edit task' : 'New task'}
+            </Text>
 
-            <TextInput
-              style={styles.input}
+            <FormInput
+              containerStyle={titleError && styles.fieldWithError}
+              style={titleError && styles.inputError}
               placeholder="Title"
-              placeholderTextColor={colors.subtext}
               value={title}
-              onChangeText={setTitle}
+              onChangeText={text => {
+                setTitle(text);
+                setTitleError(false);
+              }}
+              onSubmitEditing={handleSave}
               autoFocus={!task}
             />
+            {titleError ? (
+              <Text style={styles.errorText}>
+                Give it a title — tasks need at least a short title.
+              </Text>
+            ) : null}
 
-            <TextInput
-              style={[styles.input, styles.multiline]}
+            <FormInput
+              style={styles.multiline}
               placeholder="Notes (optional)"
-              placeholderTextColor={colors.subtext}
               value={notes}
               onChangeText={setNotes}
               multiline
@@ -128,7 +157,11 @@ export function TaskEditorModal({
                   key={p}
                   style={[styles.chip, priority === p && styles.chipActive]}
                   onPress={() => setPriority(p)}>
-                  <Text style={[styles.chipText, priority === p && styles.chipTextActive]}>
+                  <Text
+                    style={[
+                      styles.chipText,
+                      priority === p && styles.chipTextActive,
+                    ]}>
                     {p[0].toUpperCase() + p.slice(1)}
                   </Text>
                 </TouchableOpacity>
@@ -138,30 +171,58 @@ export function TaskEditorModal({
             <Text style={styles.label}>Due date</Text>
             <View style={styles.row}>
               <TouchableOpacity
-                style={[styles.chip, dueDate === undefined && styles.chipActive]}
+                style={[
+                  styles.chip,
+                  dueDate === undefined && styles.chipActive,
+                ]}
                 onPress={() => setDueDate(undefined)}>
-                <Text style={[styles.chipText, dueDate === undefined && styles.chipTextActive]}>
+                <Text
+                  style={[
+                    styles.chipText,
+                    dueDate === undefined && styles.chipTextActive,
+                  ]}>
                   None
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.chip, dueDate === todayISODate() && styles.chipActive]}
+                style={[
+                  styles.chip,
+                  dueDate === todayISODate() && styles.chipActive,
+                ]}
                 onPress={() => setDueDate(todayISODate())}>
-                <Text style={[styles.chipText, dueDate === todayISODate() && styles.chipTextActive]}>
+                <Text
+                  style={[
+                    styles.chipText,
+                    dueDate === todayISODate() && styles.chipTextActive,
+                  ]}>
                   Today
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.chip, dueDate === addDaysISO(1) && styles.chipActive]}
+                style={[
+                  styles.chip,
+                  dueDate === addDaysISO(1) && styles.chipActive,
+                ]}
                 onPress={() => setDueDate(addDaysISO(1))}>
-                <Text style={[styles.chipText, dueDate === addDaysISO(1) && styles.chipTextActive]}>
+                <Text
+                  style={[
+                    styles.chipText,
+                    dueDate === addDaysISO(1) && styles.chipTextActive,
+                  ]}>
                   Tomorrow
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.chip, dueDate === addDaysISO(7) && styles.chipActive]}
+                style={[
+                  styles.chip,
+                  dueDate === addDaysISO(7) && styles.chipActive,
+                ]}
                 onPress={() => setDueDate(addDaysISO(7))}>
-                <Text style={[styles.chipText, dueDate === addDaysISO(7) && styles.chipTextActive]}>
+                <Text
+                  style={[
+                    styles.chipText,
+                    dueDate === addDaysISO(7) && styles.chipTextActive,
+                  ]}>
                   Next week
                 </Text>
               </TouchableOpacity>
@@ -182,10 +243,16 @@ export function TaskEditorModal({
                   {RECURRENCE_TYPES.map(t => (
                     <TouchableOpacity
                       key={t}
-                      style={[styles.chip, recurrenceType === t && styles.chipActive]}
+                      style={[
+                        styles.chip,
+                        recurrenceType === t && styles.chipActive,
+                      ]}
                       onPress={() => setRecurrenceType(t)}>
                       <Text
-                        style={[styles.chipText, recurrenceType === t && styles.chipTextActive]}>
+                        style={[
+                          styles.chipText,
+                          recurrenceType === t && styles.chipTextActive,
+                        ]}>
                         {t[0].toUpperCase() + t.slice(1)}
                       </Text>
                     </TouchableOpacity>
@@ -231,17 +298,21 @@ export function TaskEditorModal({
 
             <View style={styles.actions}>
               {task && onDelete ? (
-                <TouchableOpacity style={styles.deleteAction} onPress={confirmDelete}>
+                <TouchableOpacity
+                  style={styles.deleteAction}
+                  onPress={confirmDelete}>
                   <Text style={styles.deleteActionText}>Delete</Text>
                 </TouchableOpacity>
               ) : (
                 <View />
               )}
-              <View style={styles.row}>
+              <View style={styles.actionButtons}>
                 <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleSave}>
                   <Text style={styles.saveButtonText}>Save</Text>
                 </TouchableOpacity>
               </View>
@@ -259,6 +330,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
+  backdropDialog: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
   sheet: {
     backgroundColor: colors.card,
     borderTopLeftRadius: 20,
@@ -266,20 +342,30 @@ const styles = StyleSheet.create({
     padding: 20,
     maxHeight: '88%',
   },
+  sheetDialog: {
+    width: '100%',
+    maxWidth: 540,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 28,
+  },
+  fieldWithError: {
+    marginBottom: 6,
+  },
+  inputError: {
+    borderColor: colors.high,
+  },
+  errorText: {
+    color: colors.high,
+    fontSize: 13,
+    marginBottom: 12,
+  },
   heading: {
     color: colors.text,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 14,
-  },
-  input: {
-    backgroundColor: colors.background,
-    borderRadius: 10,
-    color: colors.text,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    marginBottom: 12,
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 16,
   },
   multiline: {
     minHeight: 60,
@@ -347,6 +433,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     width: 50,
     textAlign: 'center',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   actions: {
     marginTop: 8,

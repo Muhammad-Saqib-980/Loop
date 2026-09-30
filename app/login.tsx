@@ -1,14 +1,16 @@
-import React, {useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {Link, useRouter} from 'expo-router';
 import {useAuth} from '../src/auth/AuthContext';
 import {EmailNotVerifiedError, resendVerificationApi} from '../src/api/auth';
+import {AuthLayout} from '../src/components/AuthLayout';
+import {FormInput} from '../src/components/FormInput';
 import {authStyles} from '../src/components/authScreenStyles';
-import {colors} from '../src/theme';
 
 export default function LoginScreen() {
   const {login} = useAuth();
   const router = useRouter();
+  const passwordRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -45,26 +47,37 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={authStyles.container}>
-      <Text style={authStyles.heading}>Welcome back</Text>
-
-      <TextInput
-        style={authStyles.input}
+    <AuthLayout
+      pageTitle="Log in"
+      title="Welcome back"
+      subtitle="Log in to see today's tasks.">
+      <FormInput
+        label="Email"
         placeholder="Email"
-        placeholderTextColor={colors.subtext}
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
+        autoComplete="email"
         keyboardType="email-address"
+        returnKeyType="next"
+        onSubmitEditing={() => passwordRef.current?.focus()}
       />
-      <TextInput
-        style={authStyles.input}
+      <FormInput
+        ref={passwordRef}
+        label="Password"
         placeholder="Password"
-        placeholderTextColor={colors.subtext}
         value={password}
         onChangeText={setPassword}
+        autoComplete="current-password"
         secureTextEntry
+        returnKeyType="go"
+        onSubmitEditing={handleSubmit}
       />
+      <Link
+        href="/forgot-password"
+        style={[authStyles.link, authStyles.rightLink]}>
+        Forgot your password?
+      </Link>
 
       {error ? <Text style={authStyles.error}>{error}</Text> : null}
 
@@ -94,15 +107,12 @@ export default function LoginScreen() {
         </Text>
       </TouchableOpacity>
 
-      <Link href="/forgot-password" style={authStyles.link}>
-        Forgot your password?
-      </Link>
       <View style={authStyles.row}>
         <Text style={authStyles.meta}>No account? </Text>
         <Link href="/register" style={authStyles.link}>
           Register
         </Link>
       </View>
-    </View>
+    </AuthLayout>
   );
 }

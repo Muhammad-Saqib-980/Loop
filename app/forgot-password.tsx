@@ -1,9 +1,10 @@
 import React, {useState} from 'react';
-import {Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Text, TouchableOpacity} from 'react-native';
 import {Link} from 'expo-router';
 import {forgotPasswordApi} from '../src/api/auth';
+import {AuthLayout} from '../src/components/AuthLayout';
+import {FormInput} from '../src/components/FormInput';
 import {authStyles} from '../src/components/authScreenStyles';
-import {colors} from '../src/theme';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -24,23 +25,26 @@ export default function ForgotPasswordScreen() {
   }
 
   return (
-    <View style={authStyles.container}>
-      <Text style={authStyles.heading}>Forgot password</Text>
-
+    <AuthLayout
+      pageTitle="Forgot password"
+      title="Forgot password"
+      subtitle="Enter your account email and we'll send you a link to choose a new password.">
       {sent ? (
         <Text style={authStyles.success}>
           If that account exists, a reset link has been sent to your email.
         </Text>
       ) : (
         <>
-          <TextInput
-            style={authStyles.input}
+          <FormInput
+            label="Email"
             placeholder="Email"
-            placeholderTextColor={colors.subtext}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
+            autoComplete="email"
             keyboardType="email-address"
+            returnKeyType="send"
+            onSubmitEditing={handleSubmit}
           />
           <TouchableOpacity
             style={[authStyles.button, submitting && authStyles.buttonDisabled]}
@@ -53,9 +57,9 @@ export default function ForgotPasswordScreen() {
         </>
       )}
 
-      <Link href="/login" style={authStyles.link}>
+      <Link href="/login" style={[authStyles.link, authStyles.centeredLink]}>
         Back to login
       </Link>
-    </View>
+    </AuthLayout>
   );
 }

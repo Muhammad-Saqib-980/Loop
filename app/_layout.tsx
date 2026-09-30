@@ -1,5 +1,5 @@
 import React, {useEffect} from 'react';
-import {ActivityIndicator, View} from 'react-native';
+import {ActivityIndicator, Platform, View} from 'react-native';
 import {Stack, useRouter, useSegments} from 'expo-router';
 import {AuthProvider, useAuth} from '../src/auth/AuthContext';
 import {resolveRedirect} from '../src/auth/routeGuard';
@@ -12,7 +12,7 @@ function useProtectedRoute() {
 
   useEffect(() => {
     const currentRoute = segments[0] ?? 'index';
-    const target = resolveRedirect(status, currentRoute);
+    const target = resolveRedirect(status, currentRoute, Platform.OS === 'web');
     if (target) {
       router.replace(target);
     }
