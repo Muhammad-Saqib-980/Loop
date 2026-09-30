@@ -21,7 +21,11 @@ describe('mutationQueue', () => {
   });
 
   it('enqueue assigns an id and clientTimestamp, and appends in order', async () => {
-    const first = await enqueue({type: 'create', taskId: 'tmp_1', payload: {title: 'A', priority: 'low'}});
+    const first = await enqueue({
+      type: 'create',
+      taskId: 'tmp_1',
+      payload: {title: 'A', priority: 'low'},
+    });
     const second = await enqueue({type: 'toggle', taskId: 'tmp_1'});
 
     expect(first.id).toEqual(expect.any(String));
@@ -42,14 +46,26 @@ describe('mutationQueue', () => {
   });
 
   it('remapTaskId rewrites taskId on every matching queued entry', async () => {
-    await enqueue({type: 'create', taskId: 'tmp_1', payload: {title: 'A', priority: 'low'}});
-    await enqueue({type: 'update', taskId: 'tmp_1', payload: {title: 'A2', priority: 'low'}});
+    await enqueue({
+      type: 'create',
+      taskId: 'tmp_1',
+      payload: {title: 'A', priority: 'low'},
+    });
+    await enqueue({
+      type: 'update',
+      taskId: 'tmp_1',
+      payload: {title: 'A2', priority: 'low'},
+    });
     await enqueue({type: 'delete', taskId: 'other'});
 
     await remapTaskId('tmp_1', 'real-id-9');
 
     const queue = await listQueue();
-    expect(queue.map(m => m.taskId)).toEqual(['real-id-9', 'real-id-9', 'other']);
+    expect(queue.map(m => m.taskId)).toEqual([
+      'real-id-9',
+      'real-id-9',
+      'other',
+    ]);
   });
 
   it('clearQueue empties the queue', async () => {
@@ -57,5 +73,22 @@ describe('mutationQueue', () => {
     await clearQueue();
     expect(await listQueue()).toEqual([]);
     expect(await hasPendingMutations()).toBe(false);
+  });
+});
+
+describe('mutationQueue concurrency', () => {
+  beforeEach(async () => {
+    await clearQueue();
+  });
+
+  it('does not lose an enqueue that races a removeMutation', async () => {
+    const first = await enqueue({type: 'create', taskId: 'a'});
+
+    const [, second] = await Promise.all([
+      removeMutation(first.id),
+      enqueue({type: 'toggle', taskId: 'b'}),
+    ]);
+
+    expect((await listQueue()).map(m => m.id)).toEqual([second.id]);
   });
 });
