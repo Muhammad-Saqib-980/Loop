@@ -2,7 +2,11 @@ import React from 'react';
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
 import LoginScreen from '../app/login';
 import {useAuth} from '../src/auth/AuthContext';
-import {EmailNotVerifiedError, resendVerificationApi} from '../src/api/auth';
+import {
+  EmailDisabledError,
+  EmailNotVerifiedError,
+  resendVerificationApi,
+} from '../src/api/auth';
 
 jest.mock('../src/auth/AuthContext');
 jest.mock('../src/api/auth');
@@ -70,6 +74,24 @@ describe('LoginScreen', () => {
         getByText('Verification email sent — check your inbox.'),
       ).toBeTruthy(),
     );
+  });
+
+  it('explains when the verification email cannot be sent', async () => {
+    const login = jest.fn().mockRejectedValue(new EmailNotVerifiedError());
+    mockUseAuth.mockReturnValue({login});
+    mockResendVerificationApi.mockRejectedValue(new EmailDisabledError());
+    const {getByPlaceholderText, getByText, findByText} = render(<LoginScreen />);
+
+    fireEvent.changeText(getByPlaceholderText('Email'), 'a@b.com');
+    fireEvent.changeText(getByPlaceholderText('Password'), 'password123');
+    fireEvent.press(getByText('Log in'));
+    fireEvent.press(await findByText('Resend verification email'));
+
+    expect(
+      await findByText(
+        "This server can't send emails right now. Contact the administrator to verify your account.",
+      ),
+    ).toBeTruthy();
   });
 
   it('shows a generic error for any other login failure', async () => {

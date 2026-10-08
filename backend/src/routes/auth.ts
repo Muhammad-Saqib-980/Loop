@@ -9,7 +9,7 @@ import {
 } from '../auth/tokens';
 import type { EmailSender } from '../email/sender';
 import { passwordResetEmail, verificationEmail } from '../email/templates';
-import { env } from '../env';
+import { emailEnabled, emailVerificationRequired, env } from '../env';
 import {
   createEmailVerificationToken,
   createPasswordResetToken,
@@ -30,8 +30,14 @@ const registerSchema = z.object({
   password: z.string().min(8),
 });
 
-const GENERIC_REGISTER_MESSAGE = {
-  message: 'If this email can be registered, check your inbox for a verification link.',
+export interface AuthRouterOptions {
+  emailVerificationRequired: boolean;
+  emailEnabled: boolean;
+}
+
+const EMAIL_DISABLED_RESPONSE = {
+  error: 'Email is not available on this server',
+  code: 'EMAIL_DISABLED',
 };
 
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -74,13 +80,40 @@ async function sendVerificationEmail(
   sendEmailInBackground(emailSender, email, subject, html);
 }
 
-export function createAuthRouter(emailSender: EmailSender): Router {
+export function createAuthRouter(
+  emailSender: EmailSender,
+  options: AuthRouterOptions = { emailVerificationRequired, emailEnabled },
+): Router {
+  if (options.emailVerificationRequired && !options.emailEnabled) {
+    throw new Error(
+      'REQUIRE_EMAIL_VERIFICATION is true but email is not configured ' +
+        '(set RESEND_API_KEY and EMAIL_FROM, or set REQUIRE_EMAIL_VERIFICATION=false)',
+    );
+  }
+
+  // The register response must be identical for new and existing emails, so
+  // it only ever reflects server configuration, never the account's state.
+  const registerResponse = {
+    message: options.emailVerificationRequired
+      ? 'If this email can be registered, check your inbox for a verification link.'
+      : 'If this email can be registered, you can now log in.',
+    emailVerificationRequired: options.emailVerificationRequired,
+    emailEnabled: options.emailEnabled,
+  };
+
   const router = Router();
 
-  const registerLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);
-  const resendVerificationLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);
-  const loginLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);
-  const forgotPasswordLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);
+  const registerLimiter = createAuthRateLimiter(100, 15 * 60 * 1000);
+  const resendVerificationLimiter = createAuthRateLimiter(100, 15 * 60 * 1000);
+  const loginLimiter = createAuthRateLimiter(100, 15 * 60 * 1000);
+  const forgotPasswordLimiter = createAuthRateLimiter(100, 15 * 60 * 1000);
+
+  router.get('/config', (_req, res) => {
+    res.status(200).json({
+      emailVerificationRequired: options.emailVerificationRequired,
+      emailEnabled: options.emailEnabled,
+    });
+  });
 
   router.post('/register', registerLimiter, async (req, res) => {
     const parsed = registerSchema.safeParse(req.body);
@@ -92,15 +125,19 @@ export function createAuthRouter(emailSender: EmailSender): Router {
 
     const existing = await findUserByEmail(email);
     if (existing) {
-      res.status(200).json(GENERIC_REGISTER_MESSAGE);
+      res.status(200).json(registerResponse);
       return;
     }
 
     const passwordHash = await hashPassword(password);
     const user = await createUser(email, passwordHash);
-    await sendVerificationEmail(emailSender, user.id, user.email);
+    if (options.emailVerificationRequired) {
+      await sendVerificationEmail(emailSender, user.id, user.email);
+    } else {
+      await markEmailVerified(user.id);
+    }
 
-    res.status(200).json(GENERIC_REGISTER_MESSAGE);
+    res.status(200).json(registerResponse);
   });
 
   router.post('/verify-email', async (req, res) => {
@@ -123,6 +160,10 @@ export function createAuthRouter(emailSender: EmailSender): Router {
     const parsed = z.object({ email: z.string().email() }).safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid email' });
+      return;
+    }
+    if (!options.emailEnabled) {
+      res.status(503).json(EMAIL_DISABLED_RESPONSE);
       return;
     }
     const user = await findUserByEmail(parsed.data.email);
@@ -157,7 +198,7 @@ export function createAuthRouter(emailSender: EmailSender): Router {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
-    if (!user.emailVerified) {
+    if (options.emailVerificationRequired && !user.emailVerified) {
       res.status(403).json({ error: 'Email not verified', code: 'EMAIL_NOT_VERIFIED' });
       return;
     }
@@ -215,6 +256,10 @@ export function createAuthRouter(emailSender: EmailSender): Router {
     const parsed = z.object({ email: z.string().email() }).safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid email' });
+      return;
+    }
+    if (!options.emailEnabled) {
+      res.status(503).json(EMAIL_DISABLED_RESPONSE);
       return;
     }
     const user = await findUserByEmail(parsed.data.email);

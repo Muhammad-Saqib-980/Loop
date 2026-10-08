@@ -10,5 +10,32 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U todo -d todo_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # The containerized API. Behind a profile so `docker compose up -d` still
+  # starts only Postgres for `npm run dev`; run it with
+  # `docker compose --profile app up --build`.
+  api:
+    profiles: ['app']
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Inside the compose network the database is the `postgres` service,
+      # not localhost (which would be the api container itself).
+      DATABASE_URL: postgres://todo:todo@postgres:5432/todo_dev
+      PORT: 4000
+    ports:
+      - '4000:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:

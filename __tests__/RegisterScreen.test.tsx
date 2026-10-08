@@ -44,8 +44,23 @@ describe('RegisterScreen', () => {
     expect(mockRegisterApi).not.toHaveBeenCalled();
   });
 
+  it('tells the user they can log in when verification is not required', async () => {
+    mockRegisterApi.mockResolvedValue({emailVerificationRequired: false});
+    const {getByPlaceholderText, getByText} = render(<RegisterScreen />);
+    fireEvent.changeText(getByPlaceholderText('Email'), 'a@b.com');
+    fireEvent.changeText(getByPlaceholderText('Password'), 'password123');
+    fireEvent.changeText(getByPlaceholderText('Confirm password'), 'password123');
+    fireEvent.press(getByText('Register'));
+
+    await waitFor(() =>
+      expect(
+        getByText('If this email can be registered, you can now log in.'),
+      ).toBeTruthy(),
+    );
+  });
+
   it('calls registerApi and shows the generic confirmation message on success', async () => {
-    mockRegisterApi.mockResolvedValue(undefined);
+    mockRegisterApi.mockResolvedValue({emailVerificationRequired: true});
     const {getByPlaceholderText, getByText} = render(<RegisterScreen />);
     fireEvent.changeText(getByPlaceholderText('Email'), 'a@b.com');
     fireEvent.changeText(getByPlaceholderText('Password'), 'password123');

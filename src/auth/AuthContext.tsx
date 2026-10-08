@@ -1,6 +1,6 @@
 import React, {createContext, useCallback, useContext, useEffect, useState} from 'react';
 import {clearTokens, getTokens, setTokens} from './tokenStorage';
-import {loginApi, logoutApi, registerApi} from '../api/auth';
+import {loginApi, logoutApi, registerApi, type RegisterResult} from '../api/auth';
 import {clearLocalTaskCache} from '../storage/taskStorage';
 import {setUnauthorizedHandler} from '../api/client';
 import {hasPendingMutations, PendingSyncError} from '../sync/mutationQueue';
@@ -11,7 +11,7 @@ export type AuthStatus = 'loading' | 'authed' | 'anonymous';
 interface AuthContextValue {
   status: AuthStatus;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<RegisterResult>;
   logout: () => Promise<void>;
 }
 
@@ -48,7 +48,7 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
   }, []);
 
   const register = useCallback(async (email: string, password: string) => {
-    await registerApi(email, password);
+    return registerApi(email, password);
   }, []);
 
   const logout = useCallback(async () => {

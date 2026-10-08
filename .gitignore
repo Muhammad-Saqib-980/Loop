@@ -77,3 +77,6 @@ yarn-error.log
 /backend/.env
 /backend/.env.test
 /backend/dist
+
+
+.env

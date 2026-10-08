@@ -1,7 +1,7 @@
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {Link} from 'expo-router';
-import {registerApi} from '../src/api/auth';
+import {getAuthConfigApi, registerApi} from '../src/api/auth';
 import {AuthLayout} from '../src/components/AuthLayout';
 import {FormInput} from '../src/components/FormInput';
 import {authStyles} from '../src/components/authScreenStyles';
@@ -15,6 +15,20 @@ export default function RegisterScreen() {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [verificationRequired, setVerificationRequired] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const config = await getAuthConfigApi();
+      if (!cancelled && config) {
+        setVerificationRequired(config.emailVerificationRequired);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSubmit() {
     setError(null);
@@ -32,7 +46,8 @@ export default function RegisterScreen() {
     }
     setSubmitting(true);
     try {
-      await registerApi(email.trim(), password);
+      const result = await registerApi(email.trim(), password);
+      setVerificationRequired(result.emailVerificationRequired);
       setSent(true);
     } catch {
       setError('Something went wrong. Please try again.');
@@ -45,11 +60,16 @@ export default function RegisterScreen() {
     <AuthLayout
       pageTitle="Sign up"
       title="Create account"
-      subtitle="It's free. You'll confirm your email before your first login.">
+      subtitle={
+        verificationRequired
+          ? "It's free. You'll confirm your email before your first login."
+          : "It's free. You can start right away."
+      }>
       {sent ? (
         <Text style={authStyles.success}>
-          If this email can be registered, check your inbox for a verification
-          link.
+          {verificationRequired
+            ? 'If this email can be registered, check your inbox for a verification link.'
+            : 'If this email can be registered, you can now log in.'}
         </Text>
       ) : (
         <>

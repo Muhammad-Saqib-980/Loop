@@ -1,5 +1,7 @@
 import {
+  EmailDisabledError,
   EmailNotVerifiedError,
+  getAuthConfigApi,
   InvalidCredentialsError,
   forgotPasswordApi,
   loginApi,
@@ -41,9 +43,42 @@ describe('auth API', () => {
     await expect(loginApi('a@b.com', 'wrong')).rejects.toBeInstanceOf(InvalidCredentialsError);
   });
 
-  it('registerApi resolves on a 200 response', async () => {
+  it('registerApi returns whether verification is required', async () => {
+    mockFetchOnce(200, {message: 'ok', emailVerificationRequired: false, emailEnabled: false});
+    await expect(registerApi('a@b.com', 'password123')).resolves.toEqual({
+      emailVerificationRequired: false,
+    });
+  });
+
+  it('registerApi assumes verification is required when the server does not say', async () => {
     mockFetchOnce(200, {message: 'ok'});
-    await expect(registerApi('a@b.com', 'password123')).resolves.toBeUndefined();
+    await expect(registerApi('a@b.com', 'password123')).resolves.toEqual({
+      emailVerificationRequired: true,
+    });
+  });
+
+  it('getAuthConfigApi returns the server email config', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({emailVerificationRequired: false, emailEnabled: false}),
+    });
+    await expect(getAuthConfigApi()).resolves.toEqual({
+      emailVerificationRequired: false,
+      emailEnabled: false,
+    });
+  });
+
+  it('getAuthConfigApi returns null when the request fails', async () => {
+    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+    await expect(getAuthConfigApi()).resolves.toBeNull();
+  });
+
+  it('forgotPasswordApi and resendVerificationApi throw EmailDisabledError on EMAIL_DISABLED', async () => {
+    mockFetchOnce(503, {code: 'EMAIL_DISABLED'});
+    await expect(forgotPasswordApi('a@b.com')).rejects.toBeInstanceOf(EmailDisabledError);
+    mockFetchOnce(503, {code: 'EMAIL_DISABLED'});
+    await expect(resendVerificationApi('a@b.com')).rejects.toBeInstanceOf(EmailDisabledError);
   });
 
   it('resendVerificationApi always resolves', async () => {

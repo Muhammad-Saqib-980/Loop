@@ -2,7 +2,11 @@ import React, {useRef, useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {Link, useRouter} from 'expo-router';
 import {useAuth} from '../src/auth/AuthContext';
-import {EmailNotVerifiedError, resendVerificationApi} from '../src/api/auth';
+import {
+  EmailDisabledError,
+  EmailNotVerifiedError,
+  resendVerificationApi,
+} from '../src/api/auth';
 import {AuthLayout} from '../src/components/AuthLayout';
 import {FormInput} from '../src/components/FormInput';
 import {authStyles} from '../src/components/authScreenStyles';
@@ -16,12 +20,14 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resent, setResent] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
     setError(null);
     setNeedsVerification(false);
     setResent(false);
+    setResendError(null);
     if (!email.trim() || !password) {
       setError('Enter your email and password.');
       return;
@@ -42,8 +48,17 @@ export default function LoginScreen() {
   }
 
   async function handleResend() {
-    await resendVerificationApi(email.trim());
-    setResent(true);
+    setResendError(null);
+    try {
+      await resendVerificationApi(email.trim());
+      setResent(true);
+    } catch (err) {
+      setResendError(
+        err instanceof EmailDisabledError
+          ? "This server can't send emails right now. Contact the administrator to verify your account."
+          : "Couldn't resend the verification email. Please try again.",
+      );
+    }
   }
 
   return (
@@ -86,7 +101,9 @@ export default function LoginScreen() {
           <Text style={authStyles.noticeText}>
             Your email isn't verified yet.
           </Text>
-          {resent ? (
+          {resendError ? (
+            <Text style={authStyles.noticeText}>{resendError}</Text>
+          ) : resent ? (
             <Text style={authStyles.noticeText}>
               Verification email sent — check your inbox.
             </Text>
