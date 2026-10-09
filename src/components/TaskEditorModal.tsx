@@ -18,13 +18,19 @@ import type {
   RecurrenceType,
   Task,
 } from '../types/task';
-import {toISODate, todayISODate} from '../utils/recurrence';
+import {
+  LAST_DAY_OF_MONTH,
+  firstMonthlyDayOnOrAfter,
+  toISODate,
+  todayISODate,
+} from '../utils/recurrence';
 import {confirmDestructive} from '../utils/alert';
 import {colors} from '../theme';
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high'];
 const RECURRENCE_TYPES: RecurrenceType[] = ['daily', 'weekly', 'monthly'];
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const MONTH_DAYS = Array.from({length: 31}, (_, i) => i + 1);
 
 function addDaysISO(days: number): string {
   const d = new Date();
@@ -53,6 +59,7 @@ export function TaskEditorModal({
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('daily');
   const [interval, setIntervalValue] = useState('1');
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
+  const [daysOfMonth, setDaysOfMonth] = useState<number[]>([]);
   const [titleError, setTitleError] = useState(false);
   const {width} = useWindowDimensions();
   const isDialog = width >= 700;
@@ -67,6 +74,7 @@ export function TaskEditorModal({
       setRecurrenceType(task?.recurrence?.type ?? 'daily');
       setIntervalValue(String(task?.recurrence?.interval ?? 1));
       setDaysOfWeek(task?.recurrence?.daysOfWeek ?? []);
+      setDaysOfMonth(task?.recurrence?.daysOfMonth ?? []);
       setTitleError(false);
     }
   }, [visible, task]);
@@ -74,6 +82,17 @@ export function TaskEditorModal({
   function toggleWeekday(day: number) {
     setDaysOfWeek(prev =>
       prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort(),
+    );
+  }
+
+  function toggleMonthDay(day: number) {
+    setDaysOfMonth(prev =>
+      prev.includes(day)
+        ? prev.filter(d => d !== day)
+        : // Numbered days ascending, "last day" (-1) always at the end.
+          [...prev, day].sort((a, b) =>
+            a === LAST_DAY_OF_MONTH ? 1 : b === LAST_DAY_OF_MONTH ? -1 : a - b,
+          ),
     );
   }
 
@@ -92,14 +111,27 @@ export function TaskEditorModal({
           recurrenceType === 'weekly' && daysOfWeek.length > 0
             ? daysOfWeek
             : undefined,
+        daysOfMonth:
+          recurrenceType === 'monthly' && daysOfMonth.length > 0
+            ? daysOfMonth
+            : undefined,
       };
+    }
+
+    // A new repeating task with no due date starts today, or on the first
+    // picked day of the month from today onwards.
+    let firstDueDate = dueDate;
+    if (firstDueDate === undefined && recurrence) {
+      firstDueDate = recurrence.daysOfMonth
+        ? firstMonthlyDayOnOrAfter(recurrence.daysOfMonth, todayISODate())
+        : todayISODate();
     }
 
     onSave({
       title,
       notes,
       priority,
-      dueDate: dueDate ?? (repeats ? todayISODate() : undefined),
+      dueDate: firstDueDate,
       recurrence,
     });
   }
@@ -279,7 +311,47 @@ export function TaskEditorModal({
                       </TouchableOpacity>
                     ))}
                   </View>
-                ) : (
+                ) : null}
+
+                {recurrenceType === 'monthly' ? (
+                  <View style={styles.row}>
+                    {MONTH_DAYS.map(day => (
+                      <TouchableOpacity
+                        key={day}
+                        style={[
+                          styles.dayChip,
+                          daysOfMonth.includes(day) && styles.chipActive,
+                        ]}
+                        onPress={() => toggleMonthDay(day)}>
+                        <Text
+                          style={[
+                            styles.chipText,
+                            daysOfMonth.includes(day) && styles.chipTextActive,
+                          ]}>
+                          {day}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity
+                      style={[
+                        styles.chip,
+                        daysOfMonth.includes(LAST_DAY_OF_MONTH) &&
+                          styles.chipActive,
+                      ]}
+                      onPress={() => toggleMonthDay(LAST_DAY_OF_MONTH)}>
+                      <Text
+                        style={[
+                          styles.chipText,
+                          daysOfMonth.includes(LAST_DAY_OF_MONTH) &&
+                            styles.chipTextActive,
+                        ]}>
+                        Last day
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+
+                {recurrenceType !== 'weekly' ? (
                   <View style={styles.row}>
                     <Text style={styles.meta}>Every</Text>
                     <TextInput
@@ -292,7 +364,7 @@ export function TaskEditorModal({
                       {recurrenceType === 'daily' ? 'day(s)' : 'month(s)'}
                     </Text>
                   </View>
-                )}
+                ) : null}
               </View>
             ) : null}
 

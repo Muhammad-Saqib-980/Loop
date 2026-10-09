@@ -59,7 +59,7 @@ export async function toggleTaskComplete(
     });
   }
 
-  const nextDue = computeNextDueDate(task.recurrence, today);
+  const nextDue = computeNextDueDate(task.recurrence, today, task.dueDate ?? undefined);
   return updateTaskForUser(userId, taskId, {
     history: [...task.history, today],
     dueDate: nextDue ?? task.dueDate,

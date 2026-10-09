@@ -160,3 +160,42 @@ describe('tasks API', () => {
     expect(cleared.body.dueDate).toBeNull();
   });
 });
+
+describe('monthly recurrence on specific days', () => {
+  async function create(body: Record<string, unknown>) {
+    const app = buildApp();
+    const { header } = await authHeaderFor('monthly@example.com');
+    const res = await request(app)
+      .post('/tasks')
+      .set('Authorization', header)
+      .send({ title: 'Pay rent', priority: 'medium', ...body });
+    return { app, header, res };
+  }
+
+  it('stores daysOfMonth and advances past the due date when toggled early', async () => {
+    const { app, header, res } = await create({
+      dueDate: '2099-01-15',
+      recurrence: { type: 'monthly', interval: 1, daysOfMonth: [15, -1] },
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.recurrence.daysOfMonth).toEqual([15, -1]);
+
+    const toggled = await request(app)
+      .post(`/tasks/${res.body.id}/toggle`)
+      .set('Authorization', header)
+      .expect(200);
+    expect(toggled.body.dueDate).toBe('2099-01-31');
+  });
+
+  it.each([
+    ['a day of 0', { type: 'monthly', interval: 1, daysOfMonth: [0] }],
+    ['a day of 32', { type: 'monthly', interval: 1, daysOfMonth: [32] }],
+    ['a fractional day', { type: 'monthly', interval: 1, daysOfMonth: [1.5] }],
+    ['duplicate days', { type: 'monthly', interval: 1, daysOfMonth: [5, 5] }],
+    ['an empty list', { type: 'monthly', interval: 1, daysOfMonth: [] }],
+    ['days on a weekly rule', { type: 'weekly', interval: 1, daysOfMonth: [5] }],
+  ])('rejects %s', async (_label, recurrence) => {
+    const { res } = await create({ recurrence });
+    expect(res.status).toBe(400);
+  });
+});

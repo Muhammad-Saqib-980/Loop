@@ -16,12 +16,29 @@ function isValidTaskId(id: string): boolean {
   return UUID_RE.test(id);
 }
 
-const recurrenceSchema = z.object({
-  type: z.enum(['daily', 'weekly', 'monthly']),
-  interval: z.number().int().positive(),
-  daysOfWeek: z.array(z.number().int().min(0).max(6)).optional(),
-  endDate: z.string().regex(ISO_DATE_RE).optional(),
-});
+// 1-31, or -1 for "the last day of the month".
+const dayOfMonthSchema = z
+  .number()
+  .int()
+  .refine(d => d === -1 || (d >= 1 && d <= 31), 'Must be 1-31, or -1 for the last day');
+
+const recurrenceSchema = z
+  .object({
+    type: z.enum(['daily', 'weekly', 'monthly']),
+    interval: z.number().int().positive(),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).optional(),
+    daysOfMonth: z
+      .array(dayOfMonthSchema)
+      .min(1)
+      .max(32)
+      .refine(days => new Set(days).size === days.length, 'Days must not repeat')
+      .optional(),
+    endDate: z.string().regex(ISO_DATE_RE).optional(),
+  })
+  .refine(r => r.daysOfMonth === undefined || r.type === 'monthly', {
+    message: 'daysOfMonth is only valid for monthly recurrence',
+    path: ['daysOfMonth'],
+  });
 
 const newTaskSchema = z.object({
   title: z.string().trim().min(1),

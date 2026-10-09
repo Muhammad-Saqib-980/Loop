@@ -1,5 +1,5 @@
 import React from 'react';
-import {Platform} from 'react-native';
+import {Platform, Switch} from 'react-native';
 import {fireEvent, render} from '@testing-library/react-native';
 import {TaskEditorModal} from '../src/components/TaskEditorModal';
 import type {Task} from '../src/types/task';
@@ -87,5 +87,92 @@ describe('TaskEditorModal delete on web', () => {
     fireEvent.press(getByText('Delete'));
 
     expect(onDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe('TaskEditorModal monthly days', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({now: new Date(2026, 0, 20)});
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  function renderEditor(task: Task | null = null) {
+    const onSave = jest.fn();
+    const utils = render(
+      <TaskEditorModal
+        visible
+        task={task}
+        onClose={jest.fn()}
+        onSave={onSave}
+      />,
+    );
+    return {...utils, onSave};
+  }
+
+  it('saves picked days and sets the due date to the first matching day', () => {
+    const {getByText, getByPlaceholderText, UNSAFE_getByType, onSave} =
+      renderEditor();
+    fireEvent.changeText(getByPlaceholderText('Title'), 'Pay rent');
+    fireEvent(UNSAFE_getByType(Switch), 'valueChange', true);
+    fireEvent.press(getByText('Monthly'));
+    fireEvent.press(getByText('15'));
+    fireEvent.press(getByText('Last day'));
+    fireEvent.press(getByText('Save'));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dueDate: '2026-01-31',
+        recurrence: {
+          type: 'monthly',
+          interval: 1,
+          daysOfWeek: undefined,
+          daysOfMonth: [15, -1],
+        },
+      }),
+    );
+  });
+
+  it('unpicks a day when it is pressed again', () => {
+    const {getByText, getByPlaceholderText, UNSAFE_getByType, onSave} =
+      renderEditor();
+    fireEvent.changeText(getByPlaceholderText('Title'), 'Pay rent');
+    fireEvent(UNSAFE_getByType(Switch), 'valueChange', true);
+    fireEvent.press(getByText('Monthly'));
+    fireEvent.press(getByText('15'));
+    fireEvent.press(getByText('15'));
+    fireEvent.press(getByText('Save'));
+
+    expect(onSave.mock.calls[0][0].recurrence.daysOfMonth).toBeUndefined();
+  });
+
+  it("keeps an existing task's days and due date when saved unchanged", () => {
+    const {getByText, onSave} = renderEditor({
+      ...baseTask,
+      dueDate: '2026-02-01',
+      recurrence: {type: 'monthly', interval: 2, daysOfMonth: [1]},
+    });
+    fireEvent.press(getByText('Save'));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dueDate: '2026-02-01',
+        recurrence: expect.objectContaining({interval: 2, daysOfMonth: [1]}),
+      }),
+    );
+  });
+
+  it('drops picked days when the rule is switched to weekly', () => {
+    const {getByText, onSave} = renderEditor({
+      ...baseTask,
+      dueDate: '2026-02-01',
+      recurrence: {type: 'monthly', interval: 1, daysOfMonth: [1]},
+    });
+    fireEvent.press(getByText('Weekly'));
+    fireEvent.press(getByText('Save'));
+
+    expect(onSave.mock.calls[0][0].recurrence.daysOfMonth).toBeUndefined();
   });
 });

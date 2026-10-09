@@ -58,16 +58,111 @@ function nextMatchingWeekday(from: Date, daysOfWeek: number[]): Date {
   return addDays(from, 7);
 }
 
+/** In `daysOfMonth`, stands for the last day of whichever month it is. */
+export const LAST_DAY_OF_MONTH = -1;
+
+function isValidDayOfMonth(day: number): boolean {
+  return (
+    day === LAST_DAY_OF_MONTH ||
+    (Number.isInteger(day) && day >= 1 && day <= 31)
+  );
+}
+
 /**
- * Given a recurrence rule and the date an occurrence was just completed on,
- * returns the ISO date of the next occurrence, or null if the recurrence
- * has ended.
+ * ISO dates (ascending, de-duplicated) a days-of-month rule falls on in an
+ * absolute month index (year * 12 + month). Days the month doesn't have move
+ * to its last day, so e.g. 29, 30, 31 and LAST_DAY_OF_MONTH all land on
+ * Feb 28 in a non-leap year and occur once.
+ */
+function monthlyOccurrences(
+  monthIndex: number,
+  daysOfMonth: number[],
+): string[] {
+  const year = Math.floor(monthIndex / 12);
+  const month = monthIndex % 12;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const days = new Set(
+    daysOfMonth.map(d =>
+      d === LAST_DAY_OF_MONTH ? lastDay : Math.min(d, lastDay),
+    ),
+  );
+  return [...days]
+    .sort((a, b) => a - b)
+    .map(d => toISODate(new Date(year, month, d)));
+}
+
+/**
+ * First picked day strictly after `after`, only in months that are a whole
+ * number of `interval`s from `anchor`'s month, so an every-N-months rule
+ * keeps its cycle even when completed late.
+ */
+function nextMonthlyOnDays(
+  anchor: Date,
+  after: string,
+  daysOfMonth: number[],
+  interval: number,
+): string {
+  const anchorIndex = anchor.getFullYear() * 12 + anchor.getMonth();
+  const afterDate = parseISODate(after);
+  const afterIndex = afterDate.getFullYear() * 12 + afterDate.getMonth();
+  // Jump straight to the last cycle month on or before `after`'s month, so a
+  // completion years late doesn't walk every month in between. Every date in
+  // the cycle month after that one is later than `after`, so this loop runs
+  // at most twice.
+  const periods = Math.max(
+    0,
+    Math.floor((afterIndex - anchorIndex) / interval),
+  );
+  for (
+    let monthIndex = anchorIndex + periods * interval;
+    ;
+    monthIndex += interval
+  ) {
+    const match = monthlyOccurrences(monthIndex, daysOfMonth).find(
+      iso => iso > after,
+    );
+    if (match) {
+      return match;
+    }
+  }
+}
+
+/**
+ * The first date on or after `date` that a days-of-month rule falls on, used
+ * as a new task's first due date so it starts on one of the picked days.
+ */
+export function firstMonthlyDayOnOrAfter(
+  daysOfMonth: number[],
+  date: string,
+): string {
+  const start = parseISODate(date);
+  const dayBefore = toISODate(addDays(start, -1));
+  return nextMonthlyOnDays(
+    start,
+    dayBefore,
+    daysOfMonth.filter(isValidDayOfMonth),
+    1,
+  );
+}
+
+/**
+ * Given a recurrence rule, the date an occurrence was just completed on and
+ * the task's current due date, returns the ISO date of the next occurrence,
+ * or null if the recurrence has ended.
+ *
+ * Rules pinned to specific days (weekly `daysOfWeek`, monthly `daysOfMonth`)
+ * advance past both the completion date and the due date: completing early
+ * counts as the current occurrence, and completing late skips the missed ones.
  */
 export function computeNextDueDate(
   recurrence: Recurrence,
   completedOn: string,
+  dueDate?: string,
 ): string | null {
   const from = parseISODate(completedOn);
+  const after = dueDate && dueDate > completedOn ? dueDate : completedOn;
+  const interval = Math.max(1, recurrence.interval);
+  const daysOfMonth = (recurrence.daysOfMonth ?? []).filter(isValidDayOfMonth);
   let next: Date;
 
   switch (recurrence.type) {
@@ -76,13 +171,23 @@ export function computeNextDueDate(
       break;
     case 'weekly':
       if (recurrence.daysOfWeek && recurrence.daysOfWeek.length > 0) {
-        next = nextMatchingWeekday(from, recurrence.daysOfWeek);
+        next = nextMatchingWeekday(parseISODate(after), recurrence.daysOfWeek);
       } else {
         next = addDays(from, 7 * Math.max(1, recurrence.interval));
       }
       break;
     case 'monthly':
-      next = addMonths(from, Math.max(1, recurrence.interval));
+      next =
+        daysOfMonth.length > 0
+          ? parseISODate(
+              nextMonthlyOnDays(
+                dueDate ? parseISODate(dueDate) : from,
+                after,
+                daysOfMonth,
+                interval,
+              ),
+            )
+          : addMonths(from, interval);
       break;
     default:
       return null;
@@ -93,6 +198,29 @@ export function computeNextDueDate(
     return null;
   }
   return nextISO;
+}
+
+function ordinal(day: number): string {
+  const tens = day % 100;
+  if (tens >= 11 && tens <= 13) {
+    return `${day}th`;
+  }
+  const suffix = ({1: 'st', 2: 'nd', 3: 'rd'} as Record<number, string>)[
+    day % 10
+  ];
+  return `${day}${suffix ?? 'th'}`;
+}
+
+function describeDaysOfMonth(daysOfMonth: number[]): string {
+  const days = [...new Set(daysOfMonth)];
+  const labels = days
+    .filter(d => d !== LAST_DAY_OF_MONTH)
+    .sort((a, b) => a - b)
+    .map(ordinal);
+  if (days.includes(LAST_DAY_OF_MONTH)) {
+    labels.push('last day');
+  }
+  return `the ${labels.join(', ')}`;
 }
 
 export function describeRecurrence(recurrence: Recurrence): string {
@@ -113,10 +241,19 @@ export function describeRecurrence(recurrence: Recurrence): string {
       return recurrence.interval <= 1
         ? 'Every week'
         : `Every ${recurrence.interval} weeks`;
-    case 'monthly':
+    case 'monthly': {
+      const days = (recurrence.daysOfMonth ?? []).filter(isValidDayOfMonth);
+      if (days.length > 0) {
+        return recurrence.interval <= 1
+          ? `Monthly on ${describeDaysOfMonth(days)}`
+          : `Every ${recurrence.interval} months on ${describeDaysOfMonth(
+              days,
+            )}`;
+      }
       return recurrence.interval <= 1
         ? 'Every month'
         : `Every ${recurrence.interval} months`;
+    }
     default:
       return 'Repeats';
   }

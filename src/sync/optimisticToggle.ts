@@ -23,7 +23,11 @@ export function applyOptimisticToggle(task: Task): Task {
     };
   }
 
-  const nextDue = computeNextDueDate(task.recurrence, today);
+  const nextDue = computeNextDueDate(
+    task.recurrence,
+    today,
+    task.dueDate ?? undefined,
+  );
   return {
     ...task,
     history: [...task.history, today],
